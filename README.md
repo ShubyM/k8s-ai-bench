@@ -22,7 +22,7 @@ The `run` subcommand executes the benchmark evaluations.
 ./k8s-ai-bench run --agent-bin <path/to/kubectl-ai/binary> --task-pattern scale --kubeconfig <path/to/kubeconfig> --output-dir .build/k8s-ai-bench
 
 # Run evaluation for a specific LLM provider and model with tool use shim enabled
-./k8s-ai-bench run --llm-provider=grok --models=grok-3-beta --agent-bin ../kubectl-ai --task-pattern=fix-probes --enable-tool-use-shim=true --output-dir .build/k8s-ai-bench
+./k8s-ai-bench run --llm-provider=grok --models=grok-3-beta --agent-bin kubectl-ai --task-pattern=fix-probes --enable-tool-use-shim=true --output-dir .build/k8s-ai-bench
 
 # Run evaluation sequentially (one task at a time)
 ./k8s-ai-bench run --agent-bin <path/to/kubectl-ai/binary> --tasks-dir ./tasks --output-dir .build/k8s-ai-bench --concurrency 1

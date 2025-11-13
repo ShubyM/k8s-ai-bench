@@ -68,15 +68,14 @@ for cmd in git go; do
   fi
 done
 
-# Build kubectl-ai and k8s-ai-bench binaries
+# Install kubectl-ai and build k8s-ai-bench
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd ${REPO_ROOT}
 
 BINDIR="${REPO_ROOT}/.build/bin"
 mkdir -p "${BINDIR}"
 
-cd "${REPO_ROOT}/cmd"
-go build -o "${BINDIR}/kubectl-ai" .
+curl -sSL https://raw.githubusercontent.com/GoogleCloudPlatform/kubectl-ai/main/install.sh | bash
 
 cd "${REPO_ROOT}/k8s-ai-bench"
 go build -o "${BINDIR}/k8s-ai-bench" .
@@ -101,10 +100,10 @@ do
   
   echo "Running iteration $i of $ITERATIONS..."
 
-  K8S_AI_BENCH_ARGS="--agent-bin ${BINDIR}/kubectl-ai --kubeconfig ${KUBECONFIG:-~/.kube/config} --enable-tool-use-shim=false --llm-provider=${PROVIDER} --models=${MODEL} --quiet --output-dir=${OUTPUT_DIR} --cluster-creation-policy=${CLUSTER_CREATION_POLICY} --concurrency ${CONCURRENCY} --tasks-dir=${REPO_ROOT}/k8s-ai-bench/tasks "
+  K8S_AI_BENCH_ARGS="--agent-bin kubectl-ai --kubeconfig ${KUBECONFIG:-~/.kube/config} --enable-tool-use-shim=false --llm-provider=${PROVIDER} --models=${MODEL} --quiet --output-dir=${OUTPUT_DIR} --cluster-creation-policy=${CLUSTER_CREATION_POLICY} --concurrency ${CONCURRENCY} --tasks-dir=${REPO_ROOT}/k8s-ai-bench/tasks "
 
   if [ -n "$TASK_PATTERN" ]; then
-    TEST_ARGS+="--task-pattern=${TASK_PATTERN} "
+    K8S_AI_BENCH_ARGS+="--task-pattern=${TASK_PATTERN} "
     echo "Applying task pattern: ${TASK_PATTERN}"
   fi
 
