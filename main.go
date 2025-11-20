@@ -360,8 +360,8 @@ func runAnalyze() error {
 	}
 
 	// Check if output format is valid
-	if config.OutputFormat != "markdown" && config.OutputFormat != "json" {
-		return fmt.Errorf("invalid output format: %s, valid options are 'markdown' or 'json'", config.OutputFormat)
+	if config.OutputFormat != "markdown" && config.OutputFormat != "json" && config.OutputFormat != "jsonl" {
+		return fmt.Errorf("invalid output format: %s, valid options are 'markdown', 'json' or 'jsonl'", config.OutputFormat)
 	}
 
 	// Check if input directory exists
@@ -375,13 +375,18 @@ func runAnalyze() error {
 	}
 
 	// Format and output results
-	if config.OutputFormat == "markdown" {
+	switch config.OutputFormat {
+	case "markdown":
 		if err := printMarkdownResults(config, allResults, resultsFilePath); err != nil {
 			return fmt.Errorf("printing markdown results: %w", err)
 		}
-	} else {
+	case "json":
 		if err := printJSONResults(allResults, resultsFilePath); err != nil {
 			return fmt.Errorf("printing JSON results: %w", err)
+		}
+	case "jsonl":
+		if err := printJSONLResults(allResults, resultsFilePath); err != nil {
+			return fmt.Errorf("printing JSONL results: %w", err)
 		}
 	}
 
@@ -752,6 +757,31 @@ func printJSONResults(results []model.TaskResult, resultsFilePath string) error 
 	} else {
 		// Print to stdout only if no file path is specified
 		fmt.Println(string(jsonData))
+	}
+
+	return nil
+}
+
+func printJSONLResults(results []model.TaskResult, resultsFilePath string) error {
+	var buffer strings.Builder
+	for _, result := range results {
+		jsonData, err := json.Marshal(result)
+		if err != nil {
+			return fmt.Errorf("marshaling result to JSON: %w", err)
+		}
+		buffer.Write(jsonData)
+		buffer.WriteString("\n")
+	}
+
+	// Write to file if path is provided, otherwise print to stdout
+	if resultsFilePath != "" {
+		if err := os.WriteFile(resultsFilePath, []byte(buffer.String()), 0644); err != nil {
+			return fmt.Errorf("writing to file %q: %w", resultsFilePath, err)
+		}
+		fmt.Printf("Results written to %s\n", resultsFilePath)
+	} else {
+		// Print to stdout only if no file path is specified
+		fmt.Print(buffer.String())
 	}
 
 	return nil

@@ -130,7 +130,7 @@ func runEvaluation(ctx context.Context, config EvalConfig) error {
 				for _, llmConfig := range config.LLMConfigs {
 					taskOutputDir := ""
 					if config.OutputDir != "" {
-						taskOutputDir = filepath.Join(config.OutputDir, job.taskID, llmConfig.ID)
+						taskOutputDir = filepath.Join(config.OutputDir, job.taskID)
 						if err := os.MkdirAll(taskOutputDir, 0755); err != nil {
 							errorsCh <- fmt.Errorf("creating directory %q: %w", taskOutputDir, err)
 							return
@@ -288,7 +288,7 @@ func evaluateTask(ctx context.Context, config EvalConfig, taskID string, task Ta
 	taskCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	taskOutputDir := filepath.Join(config.OutputDir, taskID, llmConfig.ID)
+	taskOutputDir := filepath.Join(config.OutputDir, taskID)
 
 	var logBuffer bytes.Buffer
 	multiWriter := io.MultiWriter(&logBuffer)
@@ -343,15 +343,7 @@ func evaluateTask(ctx context.Context, config EvalConfig, taskID string, task Ta
 		logString := logBuffer.String()
 		logTail, truncated := getLastNLines(logString, maxErrLogLines)
 		// build log file path
-		shimSegment := "shim_disabled"
-		if x.llmConfig.EnableToolUseShim {
-			shimSegment = "shim_enabled"
-		}
-		logPath := filepath.Join(
-			config.OutputDir,
-			taskID,
-			shimSegment+"-"+x.llmConfig.ProviderID+"-"+x.llmConfig.ModelID,
-		)
+		logPath := taskOutputDir
 		errorMessage := fmt.Sprintf("agent encountered error: %v\n---LOG---\n%s", err, logTail)
 		if truncated {
 			errorMessage += fmt.Sprintf("\n... (log truncated, full log at %s)", logPath)
@@ -416,15 +408,7 @@ func evaluateTask(ctx context.Context, config EvalConfig, taskID string, task Ta
 			logString := logBuffer.String()
 			logTail, truncated := getLastNLines(logString, maxLogLines)
 			// build log file path
-			shimSegment := "shim_disabled"
-			if x.llmConfig.EnableToolUseShim {
-				shimSegment = "shim_enabled"
-			}
-			logPath := filepath.Join(
-				config.OutputDir,
-				taskID,
-				shimSegment+"-"+x.llmConfig.ProviderID+"-"+x.llmConfig.ModelID,
-			)
+			logPath := taskOutputDir
 			failureMessage := fmt.Sprintf("verifier script failed: %v\n---LOG---\n%s", err, logTail)
 			if truncated {
 				failureMessage += fmt.Sprintf("\n... (log truncated, full log at %s)", logPath)

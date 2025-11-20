@@ -96,7 +96,9 @@ echo "Task Pattern: ${TASK_PATTERN:-"All Tasks"}"
 # Loop from 1 to the specified number of iterations
 for i in $(seq 1 $ITERATIONS)
 do
-  OUTPUT_DIR="${REPO_ROOT}/.build/k8s-ai-bench-${MODEL}-${i}"
+  # Create a sanitized version of model name: replace all '/' with '-'
+  SAFE_MODEL="${MODEL//\//-}"
+  OUTPUT_DIR="${REPO_ROOT}/.build/k8s-ai-bench-${SAFE_MODEL}-${i}"
   
   echo "Running iteration $i of $ITERATIONS..."
 
@@ -124,6 +126,7 @@ do
   # Paths for analysis files
   MARKDOWN_FILE="${OUTPUT_DIR}/k8s-ai-bench.md"
   JSON_FILE="${OUTPUT_DIR}/k8s-ai-bench.json"
+  JSONL_FILE="${OUTPUT_DIR}/k8s-ai-bench.jsonl"
 
   # Run for markdown format
   "${K8S_AI_BENCH_BIN}" analyze --input-dir="${OUTPUT_DIR}" --results-filepath="${MARKDOWN_FILE}" --output-format=markdown --show-failures
@@ -136,6 +139,13 @@ do
   "${K8S_AI_BENCH_BIN}" analyze --input-dir="${OUTPUT_DIR}" --results-filepath="${JSON_FILE}" --output-format=json --show-failures
   if [ $? -ne 0 ]; then
     echo "Error on iteration $i during JSON analysis. Aborting loop."
+    exit 1
+  fi
+
+  # Run for jsonl format
+  "${K8S_AI_BENCH_BIN}" analyze --input-dir="${OUTPUT_DIR}" --results-filepath="${JSONL_FILE}" --output-format=jsonl --show-failures
+  if [ $? -ne 0 ]; then
+    echo "Error on iteration $i during JSONL analysis. Aborting loop."
     exit 1
   fi
 
