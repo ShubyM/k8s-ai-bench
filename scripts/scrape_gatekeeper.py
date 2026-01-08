@@ -10,6 +10,25 @@ GITHUB_API = "https://api.github.com/repos/open-policy-agent/gatekeeper-library/
 RAW_BASE = "https://raw.githubusercontent.com/open-policy-agent/gatekeeper-library/master"
 CATEGORIES = ["library/general", "library/pod-security-policy"]
 OUTPUT_DIR = Path(__file__).parent.parent / "tasks" / "gatekeeper"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+
+
+def generate_description(constraint: str) -> str:
+    """Use Gemini to generate a natural language description of the constraint."""
+    if not GEMINI_API_KEY:
+        return ""
+    resp = requests.post(
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+        json={
+            "contents": [{"parts": [{"text": f"""Describe this Gatekeeper constraint policy in plain English. Be concise (2-3 sentences). Focus on what the policy requires/forbids. Don't mention Gatekeeper or Kubernetes jargon.
+
+{constraint}"""}]}]
+        },
+        timeout=30,
+    )
+    if resp.ok:
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    return ""
 
 
 def fetch_json(path: str) -> list:
@@ -121,23 +140,19 @@ exit 0
     (task_dir / "verify.sh").write_text(verify)
     os.chmod(task_dir / "verify.sh", 0o755)
 
-    # Parse constraint for context
-    constraint_yaml = yaml.safe_load(sample["constraint"])
-    constraint_kind = constraint_yaml.get("kind", "Unknown")
-    constraint_spec = yaml.dump(constraint_yaml.get("spec", {}), default_flow_style=False)
+    # Generate natural language description
+    description = generate_description(sample["constraint"])
+    if not description:
+        description = "A compliance policy is in effect for this cluster."
 
     # task.yaml
     task = {
         "script": [{
-            "prompt": f"""The following Gatekeeper constraint policy is in effect:
+            "prompt": f"""{description}
 
-```yaml
-{sample['constraint'].strip()}
-```
+Two resources have been deployed in namespace '{namespace}'. Examine them and determine which resource(s) violate the policy.
 
-Two resources have been deployed in namespace '{namespace}'. Examine them and determine which resource(s) violate the above constraint policy.
-
-After your analysis, output a single line starting with "VIOLATING:" followed by the resource name(s) that violate the policy.""",
+After your analysis, output a single line starting with "VIOLATING:" followed by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources comply.""",
             "setup": "setup.sh",
             "cleanup": "cleanup.sh",
             "difficulty": "medium",
