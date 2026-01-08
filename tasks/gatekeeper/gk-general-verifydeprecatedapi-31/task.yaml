@@ -1,0 +1,47 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: VerifyDeprecatedAPI\nmetadata:\n  name:\
+    \ verify-1.22\nspec:\n  match:\n    kinds:\n      - apiGroups: [\"admissionregistration.k8s.io\"\
+    ]\n        kinds: [\"MutatingWebhookConfiguration\", \"ValidatingWebhookConfiguration\"\
+    ]\n      - apiGroups: [\"apiextensions.k8s.io\"]\n        kinds: [\"CustomResourceDefinition\"\
+    ]\n      - apiGroups: [\"apiregistration.k8s.io\"]\n        kinds: [\"APIService\"\
+    ]\n      - apiGroups: [\"authentication.k8s.io\"]\n        kinds: [\"TokenReview\"\
+    ]\n      - apiGroups: [\"authorization.k8s.io\"]\n        kinds: [\"SubjectAccessReview\"\
+    ]\n      - apiGroups: [\"certificates.k8s.io\"]\n        kinds: [\"CertificateSigningRequest\"\
+    ]\n      - apiGroups: [\"coordination.k8s.io\"]\n        kinds: [\"Lease\"]\n\
+    \      - apiGroups: [\"extensions\", \"networking.k8s.io\"]\n        kinds: [\"\
+    Ingress\"]\n      - apiGroups: [\"networking.k8s.io\"]\n        kinds: [\"IngressClass\"\
+    ]\n      - apiGroups: [\"rbac.authorization.k8s.io\"]\n        kinds: [\"ClusterRole\"\
+    , \"ClusterRoleBinding\", \"Role\", \"RoleBinding\"]\n      - apiGroups: [\"scheduling.k8s.io\"\
+    ]\n        kinds: [\"PriorityClass\"]\n      - apiGroups: [\"storage.k8s.io\"\
+    ]\n        kinds: [\"CSIDriver\", \"CSINode\", \"StorageClass\", \"VolumeAttachment\"\
+    ]\n  parameters:\n    kvs:\n      - deprecatedAPI: \"admissionregistration.k8s.io/v1beta1\"\
+    \n        kinds: [\"MutatingWebhookConfiguration\", \"ValidatingWebhookConfiguration\"\
+    ]\n        targetAPI: \"admissionregistration.k8s.io/v1\"\n      - deprecatedAPI:\
+    \ \"apiextensions.k8s.io/v1beta1\"\n        kinds: [\"CustomResourceDefinition\"\
+    ]\n        targetAPI: \"apiextensions.k8s.io/v1\"\n      - deprecatedAPI: \"apiregistration.k8s.io/v1beta1\"\
+    \n        kinds: [\"APIService\"]\n        targetAPI: \"apiregistration.k8s.io/v1\"\
+    \n      - deprecatedAPI: \"authentication.k8s.io/v1beta1\"\n        kinds: [\"\
+    TokenReview\"]\n        targetAPI: \"authentication.k8s.io/v1\"\n      - deprecatedAPI:\
+    \ \"authorization.k8s.io/v1beta1\"\n        kinds: [\"SubjectAccessReview\"]\n\
+    \        targetAPI: \"authorization.k8s.io/v1\"\n      - deprecatedAPI: \"certificates.k8s.io/v1beta1\"\
+    \n        kinds: [\"CertificateSigningRequest\"]\n        targetAPI: \"certificates.k8s.io/v1\"\
+    \n      - deprecatedAPI: \"coordination.k8s.io/v1beta1\"\n        kinds: [\"Lease\"\
+    ]\n        targetAPI: \"coordination.k8s.io/v1\"\n      - deprecatedAPI: \"extensions/v1beta1\"\
+    \n        kinds: [\"Ingress\"]\n        targetAPI: \"networking.k8s.io/v1\"\n\
+    \      - deprecatedAPI: \"networking.k8s.io/v1beta1\"\n        kinds: [\"Ingress\"\
+    , \"IngressClass\"]\n        targetAPI: \"networking.k8s.io/v1\"\n      - deprecatedAPI:\
+    \ \"rbac.authorization.k8s.io/v1beta1\"\n        kinds: [\"ClusterRole\", \"ClusterRoleBinding\"\
+    , \"Role\", \"RoleBinding\"]\n        targetAPI: \"rbac.authorization.k8s.io/v1\"\
+    \n      - deprecatedAPI: \"scheduling.k8s.io/v1beta1\"\n        kinds: [\"PriorityClass\"\
+    ]\n        targetAPI: \"scheduling.k8s.io/v1\"\n      - deprecatedAPI: \"storage.k8s.io/v1beta1\"\
+    \n        kinds: [\"CSIDriver\", \"CSINode\", \"StorageClass\", \"VolumeAttachment\"\
+    ]\n        targetAPI: \"storage.k8s.io/v1\"\n    k8sVersion: 1.22\n```\n\nTwo\
+    \ resources have been deployed in namespace 'gk-test-031'. Examine them and determine\
+    \ which resource(s) violate the above constraint policy. Explain your reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta

@@ -1,0 +1,14 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: K8sHttpsOnly\nmetadata:\n  name: ingress-https-only-tls-optional\n\
+    spec:\n  match:\n    kinds:\n      - apiGroups: [\"extensions\", \"networking.k8s.io\"\
+    ]\n        kinds: [\"Ingress\"]\n  parameters:\n    tlsOptional: true\n```\n\n\
+    Two resources have been deployed in namespace 'gk-test-017'. Examine them and\
+    \ determine which resource(s) violate the above constraint policy. Explain your\
+    \ reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta

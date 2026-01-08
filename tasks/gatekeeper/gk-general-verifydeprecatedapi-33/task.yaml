@@ -1,0 +1,19 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: VerifyDeprecatedAPI\nmetadata:\n  name:\
+    \ verify-1.26\nspec:\n  match:\n    kinds:\n      - apiGroups: [\"flowcontrol.apiserver.k8s.io\"\
+    ]\n        kinds: [\"FlowSchema\", \"PriorityLevelConfiguration\"]\n      - apiGroups:\
+    \ [\"autoscaling\"]\n        kinds: [\"HorizontalPodAutoscaler\"]\n  parameters:\n\
+    \    kvs: \n      - deprecatedAPI: \"flowcontrol.apiserver.k8s.io/v1beta1\"\n\
+    \        kinds: [\"FlowSchema\", \"PriorityLevelConfiguration\"]\n        targetAPI:\
+    \ \"flowcontrol.apiserver.k8s.io/v1beta3\"\n      - deprecatedAPI: \"autoscaling/v2beta2\"\
+    \n        kinds: [\"HorizontalPodAutoscaler\"]\n        targetAPI: \"autoscaling/v2\"\
+    \n    k8sVersion: 1.26\n```\n\nTwo resources have been deployed in namespace 'gk-test-033'.\
+    \ Examine them and determine which resource(s) violate the above constraint policy.\
+    \ Explain your reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta

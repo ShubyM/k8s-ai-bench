@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-beta
+spec:
+  containers:
+  - image: nginx:1.7.9
+    livenessProbe: null
+    name: container-beta
+    ports:
+    - containerPort: 80
+    volumeMounts:
+    - mountPath: /tmp/cache
+      name: cache-volume
+  - image: tomcat
+    name: container-beta-1
+    ports:
+    - containerPort: 8080
+    readinessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      tcpSocket:
+        port: 8080
+  volumes:
+  - emptyDir: {}
+    name: cache-volume

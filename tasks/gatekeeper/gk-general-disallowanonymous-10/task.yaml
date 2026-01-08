@@ -1,0 +1,15 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: K8sDisallowAnonymous\nmetadata:\n \
+    \ name: no-anonymous\nspec:\n  match:\n    kinds:\n      - apiGroups: [\"rbac.authorization.k8s.io\"\
+    ]\n        kinds: [\"ClusterRoleBinding\"]\n      - apiGroups: [\"rbac.authorization.k8s.io\"\
+    ]\n        kinds: [\"RoleBinding\"]\n  parameters:\n    allowedRoles: \n     \
+    \ - cluster-role-1\n```\n\nTwo resources have been deployed in namespace 'gk-test-010'.\
+    \ Examine them and determine which resource(s) violate the above constraint policy.\
+    \ Explain your reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta

@@ -1,0 +1,25 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: VerifyDeprecatedAPI\nmetadata:\n  name:\
+    \ verify-1.16\nspec:\n  match:\n    kinds:\n      - apiGroups: [\"apps\"]\n  \
+    \      kinds: [\"Deployment\", \"ReplicaSet\", \"StatefulSet\", \"DaemonSet\"\
+    ]\n      - apiGroups: [\"extensions\"]\n        kinds: [\"PodSecurityPolicy\"\
+    , \"ReplicaSet\", \"Deployment\", \"DaemonSet\", \"NetworkPolicy\"]\n  parameters:\n\
+    \    kvs: \n      - deprecatedAPI: \"apps/v1beta1\"\n        kinds: [\"Deployment\"\
+    , \"ReplicaSet\", \"StatefulSet\"]\n        targetAPI: \"apps/v1\"\n      - deprecatedAPI:\
+    \ \"extensions/v1beta1\"\n        kinds: [\"ReplicaSet\", \"Deployment\", \"DaemonSet\"\
+    ]\n        targetAPI: \"apps/v1\"\n      - deprecatedAPI: \"extensions/v1beta1\"\
+    \n        kinds: [\"PodSecurityPolicy\"]\n        targetAPI: \"policy/v1beta1\"\
+    \n      - deprecatedAPI: \"apps/v1beta2\"\n        kinds: [\"ReplicaSet\", \"\
+    StatefulSet\", \"Deployment\", \"DaemonSet\"]\n        targetAPI: \"apps/v1\"\n\
+    \      - deprecatedAPI: \"extensions/v1beta1\"\n        kinds: [\"NetworkPolicy\"\
+    ]\n        targetAPI: \"networking.k8s.io/v1\"\n    k8sVersion: 1.16\n```\n\n\
+    Two resources have been deployed in namespace 'gk-test-030'. Examine them and\
+    \ determine which resource(s) violate the above constraint policy. Explain your\
+    \ reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta

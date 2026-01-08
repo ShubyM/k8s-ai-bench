@@ -1,0 +1,16 @@
+script:
+- prompt: "The following Gatekeeper constraint policy is in effect:\n\n```yaml\napiVersion:\
+    \ constraints.gatekeeper.sh/v1beta1\nkind: K8sAllowedReposv2\nmetadata:\n  name:\
+    \ repo-is-openpolicyagent\nspec:\n  match:\n    kinds:\n      - apiGroups: [\"\
+    \"]\n        kinds: [\"Pod\"]\n    namespaces:\n      - \"default\"\n  parameters:\n\
+    \    allowedImages:\n      - \"openpolicyagent/*\"\n      - \"myregistry.azurecr.io/*\"\
+    \n      - \"mydockerhub/*\"\n      - \"ubuntu:20.14\"\n      - \"123456789123.dkr.ecr.eu-west-1.amazonaws.com/postgres\"\
+    \n```\n\nTwo resources have been deployed in namespace 'gk-test-001'. Examine\
+    \ them and determine which resource(s) violate the above constraint policy. Explain\
+    \ your reasoning."
+  setup: setup.sh
+  verifier: verify.sh
+  cleanup: cleanup.sh
+  difficulty: medium
+  expect:
+  - contains: resource-beta
