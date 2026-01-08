@@ -5,11 +5,12 @@ script:
     \  kinds: [\"Pod\"]\n  parameters:\n    exemptImages:\n    - nginx-exempt \n \
     \   allowedProfiles:\n    - RuntimeDefault\n    - Localhost\n    allowedLocalhostFiles:\n\
     \    - \"*\"\n```\n\nTwo resources have been deployed in namespace 'gk-test-049'.\
-    \ Examine them and determine which resource(s) violate the above constraint policy.\
-    \ Explain your reasoning."
+    \ Examine them and determine which resource(s) violate the above constraint policy.\n\
+    \nAfter your analysis, output a single line starting with \"VIOLATING:\" followed\
+    \ by the resource name(s) that violate the policy."
   setup: setup.sh
-  verifier: verify.sh
   cleanup: cleanup.sh
   difficulty: medium
   expect:
+  - contains: 'VIOLATING:'
   - contains: resource-beta

@@ -135,12 +135,13 @@ exit 0
 {sample['constraint'].strip()}
 ```
 
-Two resources have been deployed in namespace '{namespace}'. Examine them and determine which resource(s) violate the above constraint policy. Explain your reasoning.""",
+Two resources have been deployed in namespace '{namespace}'. Examine them and determine which resource(s) violate the above constraint policy.
+
+After your analysis, output a single line starting with "VIOLATING:" followed by the resource name(s) that violate the policy.""",
             "setup": "setup.sh",
-            "verifier": "verify.sh",
             "cleanup": "cleanup.sh",
             "difficulty": "medium",
-            "expect": [{"contains": "resource-beta"}],
+            "expect": [{"contains": "VIOLATING:"}, {"contains": "resource-beta"}],
         }]
     }
     (task_dir / "task.yaml").write_text(yaml.dump(task, default_flow_style=False, sort_keys=False))
