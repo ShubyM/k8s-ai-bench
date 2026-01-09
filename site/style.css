@@ -327,6 +327,32 @@ th.desc::after {
   text-decoration: underline;
 }
 
+/* Lab icon styles */
+.lab-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.lab-icon {
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+}
+
+.model-cell {
+  display: flex;
+  align-items: center;
+}
+
+.model-name {
+  font-weight: bold;
+  font-size: 1.05em;
+  color: #24292e;
+}
+
 .task-link {
   text-decoration: none;
   color: #24292e;
