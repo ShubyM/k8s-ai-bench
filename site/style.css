@@ -328,29 +328,40 @@ th.desc::after {
 }
 
 /* Lab icon styles */
-.lab-icon-wrapper {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
 .lab-icon {
   width: 20px;
   height: 20px;
+  margin-right: 8px;
   vertical-align: middle;
+  flex-shrink: 0;
 }
 
 .model-cell {
   display: flex;
   align-items: center;
+  width: 100%;
+}
+
+.model-cell .model-link,
+.model-cell .model-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .model-name {
   font-weight: bold;
   font-size: 1.05em;
   color: #24292e;
+}
+
+/* Icon in h1 title */
+h1 .lab-icon {
+  width: 28px;
+  height: 28px;
+  margin-right: 10px;
 }
 
 .task-link {

@@ -58,7 +58,8 @@
 				}
 				const lab = getLabInfo(modelId);
 				const displayName = getModelDisplayName(modelId);
-				document.getElementById('model-title').innerHTML = '<span class="lab-icon-wrapper" style="color: ' + lab.color + ';">' + lab.icon + '</span> ' + displayName;
+				let iconHtml = lab.icon ? '<img src="' + lab.icon + '" class="lab-icon" alt="' + lab.name + '">' : '';
+				document.getElementById('model-title').innerHTML = iconHtml + ' ' + displayName;
 				const tbody = document.querySelector('#details-table tbody');
 				
 				let filteredData = data;

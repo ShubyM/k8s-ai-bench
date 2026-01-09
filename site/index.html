@@ -94,7 +94,7 @@
 					const modelCell = getModelWithIcon(row.id, 'model.html?id='+encodeURIComponent(row.id));
 					return '<tr><td class="model-cell">' + modelCell + '</td>' +
 						   '<td><div class="score-container"><div class="score-text" style="font-weight:bold;">'+val+'%</div>' +
-						   createLabBar(val, row.id) + '</div></td>' +
+						   createModelBar(val, row.id) + '</div></td>' +
 						   '<td><span style="font-size:0.85em; color:#57606a;">'+row.type+'</span></td></tr>';
 				}).join('');
 			}
