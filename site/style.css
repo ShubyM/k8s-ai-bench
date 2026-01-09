@@ -329,23 +329,20 @@ th.desc::after {
 
 /* Lab icon styles */
 .lab-icon {
-  width: 20px;
   height: 20px;
+  width: auto;
   margin-right: 8px;
   vertical-align: middle;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .model-cell {
-  display: flex;
-  align-items: center;
   width: 100%;
 }
 
 .model-cell .model-link,
 .model-cell .model-name {
-  flex: 1;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -359,9 +356,10 @@ th.desc::after {
 
 /* Icon in h1 title */
 h1 .lab-icon {
-  width: 28px;
   height: 28px;
+  width: auto;
   margin-right: 10px;
+  /* Slight optical adjustment for header alignment */
 }
 
 .task-link {
