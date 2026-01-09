@@ -1,0 +1,19 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires all Pods to use a specific SELinux option with a defined
+    level, role, type, and user.  Specifically, Pods must use the SELinux option `level:
+    s0:c123,c456`, `role: object_r`, `type: svirt_sandbox_file_t`, and `user: system_u`.
+
+
+    Two resources have been deployed in namespace ''gk-test-038''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

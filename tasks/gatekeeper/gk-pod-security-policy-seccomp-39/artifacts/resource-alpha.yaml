@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    seccomp.security.alpha.kubernetes.io/pod: runtime/default
+  labels:
+    app: app-alpha
+  name: resource-alpha
+spec:
+  containers:
+  - image: nginx
+    name: container-alpha

@@ -1,0 +1,15 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy enforces specific security requirements for Pods within the\
+    \ `default` namespace. It mandates that all Pods must explicitly drop the `must_drop`\
+    \ capability and are only allowed to request the `something` capability.\n   \
+    \ \nLook at the resources that have been deployed in namespace gk-test-040. Examine\
+    \ them and determine which resource(s) violate the policy.\n\nAfter your analysis,\
+    \ output a single line starting with \"VIOLATING:\" followed by the resource name(s)\
+    \ that violate the policy, or \"VIOLATING: none\" if all resources comply."

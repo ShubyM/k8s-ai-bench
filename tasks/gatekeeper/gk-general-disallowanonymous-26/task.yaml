@@ -1,0 +1,16 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy forbids creating or modifying ClusterRoleBindings and RoleBindings\
+    \ unless the \"user\" or \"group\" referenced in the binding is explicitly named.\
+    \  The exception is that binding to the specific pre-approved role, \"cluster-role-1\"\
+    , is always permitted.\n    \nLook at the resources that have been deployed in\
+    \ namespace gk-test-026. Examine them and determine which resource(s) violate\
+    \ the policy.\n\nAfter your analysis, output a single line starting with \"VIOLATING:\"\
+    \ followed by the resource name(s) that violate the policy, or \"VIOLATING: none\"\
+    \ if all resources comply."

@@ -1,0 +1,18 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires that all Pods have at least two containers defined
+    within them. Pods with fewer than two containers are not allowed.
+
+
+    Two resources have been deployed in namespace ''gk-test-009''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

@@ -1,0 +1,15 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy mandates that all namespaces must have an `owner` label. The\
+    \ value of the `owner` label must conform to a specific pattern representing a\
+    \ company username (e.g., \"john.agilebank.demo\").\n    \nLook at the resources\
+    \ that have been deployed in namespace gk-test-011. Examine them and determine\
+    \ which resource(s) violate the policy.\n\nAfter your analysis, output a single\
+    \ line starting with \"VIOLATING:\" followed by the resource name(s) that violate\
+    \ the policy, or \"VIOLATING: none\" if all resources comply."

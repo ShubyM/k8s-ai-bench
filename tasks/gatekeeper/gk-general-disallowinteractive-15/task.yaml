@@ -1,0 +1,16 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy forbids Pods from requesting interactive terminal (TTY) allocation\
+    \ for their containers.  Specifically, it prevents containers from setting `tty:\
+    \ true` in their specification, ensuring containers don't allocate a pseudo-TTY,\
+    \ typically used for interactive sessions.\n    \nLook at the resources that have\
+    \ been deployed in namespace gk-test-015. Examine them and determine which resource(s)\
+    \ violate the policy.\n\nAfter your analysis, output a single line starting with\
+    \ \"VIOLATING:\" followed by the resource name(s) that violate the policy, or\
+    \ \"VIOLATING: none\" if all resources comply."

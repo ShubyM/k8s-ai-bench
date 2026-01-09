@@ -1,0 +1,19 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires all Pods to define CPU request of at least 200 milliCPUs
+    and memory request of at least 1 GiB. If a Pod does not meet these requirements,
+    it will be rejected.
+
+
+    Two resources have been deployed in namespace ''gk-test-007''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

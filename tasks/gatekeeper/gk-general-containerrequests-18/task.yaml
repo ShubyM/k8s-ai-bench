@@ -1,0 +1,15 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy requires all Pods to specify a minimum CPU request of 200 millicores\
+    \ and a minimum memory request of 1 Gigabyte.  Any Pod lacking these resource\
+    \ requests will be rejected.\n    \nLook at the resources that have been deployed\
+    \ in namespace gk-test-018. Examine them and determine which resource(s) violate\
+    \ the policy.\n\nAfter your analysis, output a single line starting with \"VIOLATING:\"\
+    \ followed by the resource name(s) that violate the policy, or \"VIOLATING: none\"\
+    \ if all resources comply."

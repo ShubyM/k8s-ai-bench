@@ -1,0 +1,21 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires that any Pod created in the `default` namespace uses
+    an image from one of the specified repositories: `openpolicyagent/*`, `myregistry.azurecr.io/*`,
+    `mydockerhub/*`, `ubuntu:20.14`, or `123456789123.dkr.ecr.eu-west-1.amazonaws.com/postgres`.
+    Any Pod in the `default` namespace using an image from a different repository
+    will be rejected.
+
+
+    Two resources have been deployed in namespace ''gk-test-001''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

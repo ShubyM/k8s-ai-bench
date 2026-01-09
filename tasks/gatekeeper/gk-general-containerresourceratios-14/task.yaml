@@ -1,0 +1,16 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy requires that every Pod defines resource requests and limits\
+    \ for all containers within it.  Specifically, the memory limit must be equal\
+    \ to the memory request, and the CPU limit must be ten times greater than the\
+    \ CPU request.\n    \nLook at the resources that have been deployed in namespace\
+    \ gk-test-014. Examine them and determine which resource(s) violate the policy.\n\
+    \nAfter your analysis, output a single line starting with \"VIOLATING:\" followed\
+    \ by the resource name(s) that violate the policy, or \"VIOLATING: none\" if all\
+    \ resources comply."

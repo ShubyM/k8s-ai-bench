@@ -1,0 +1,16 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy requires that all Pods only use the following volume types:\
+    \ configMap, emptyDir, projected, secret, downwardAPI, persistentVolumeClaim,\
+    \ and flexVolume.  It forbids the use of any other volume type in Pods, effectively\
+    \ restricting how data can be accessed within containers.\n    \nLook at the resources\
+    \ that have been deployed in namespace gk-test-032. Examine them and determine\
+    \ which resource(s) violate the policy.\n\nAfter your analysis, output a single\
+    \ line starting with \"VIOLATING:\" followed by the resource name(s) that violate\
+    \ the policy, or \"VIOLATING: none\" if all resources comply."

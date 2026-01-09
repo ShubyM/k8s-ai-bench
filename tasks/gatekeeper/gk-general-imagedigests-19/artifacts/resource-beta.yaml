@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-beta
+spec:
+  containers:
+  - image: nginx:latest
+    name: container-beta
+  initContainers:
+  - command:
+    - sh
+    - -c
+    - exit 0
+    image: nginx:latest
+    name: init-container-beta

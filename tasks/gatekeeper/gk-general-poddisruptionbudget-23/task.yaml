@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires Deployments, StatefulSets, and ReplicationControllers
+    to have a corresponding PodDisruptionBudget defined.  This ensures that these
+    workloads are protected from unintentional disruptions. It also requires any PodDisruptionBudget
+    resources to be associated with one of these workload types.
+
+
+    Two resources have been deployed in namespace ''gk-test-023''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

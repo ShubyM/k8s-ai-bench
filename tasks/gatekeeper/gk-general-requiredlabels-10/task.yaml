@@ -1,0 +1,15 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+- not_contains: resource-alpha
+script:
+- prompt: "This policy mandates that all Pods must have a label with the key `pizza`.\
+    \  The value of the `pizza` label doesn't matter, only its presence is enforced.\n\
+    \    \nLook at the resources that have been deployed in namespace gk-test-010.\
+    \ Examine them and determine which resource(s) violate the policy.\n\nAfter your\
+    \ analysis, output a single line starting with \"VIOLATING:\" followed by the\
+    \ resource name(s) that violate the policy, or \"VIOLATING: none\" if all resources\
+    \ comply."

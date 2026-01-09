@@ -1,0 +1,19 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy prevents pods from running as privileged containers, except
+    in the `kube-system` namespace.  It also allows images from the `safeimages.com`
+    registry to bypass this restriction, regardless of other settings.
+
+
+    Two resources have been deployed in namespace ''gk-test-037''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

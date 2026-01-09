@@ -1,0 +1,19 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+script:
+- prompt: 'This policy requires all Services to have specific annotations: `a8r.io/owner`
+    and `a8r.io/runbook`. The `a8r.io/owner` annotation must be a valid email or GitHub
+    username, while `a8r.io/runbook` must be a valid URL.
+
+
+    Two resources have been deployed in namespace ''gk-test-017''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'

@@ -1,0 +1,20 @@
+script:
+- prompt: 'This policy restricts which FlexVolume drivers can be used in Pod specifications.  Only
+    Pods using the `example/lvm` or `example/cifs` FlexVolume drivers are allowed;
+    all others are forbidden.
+
+
+    Two resources have been deployed in namespace ''gk-test-039''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+verifier: verify.sh

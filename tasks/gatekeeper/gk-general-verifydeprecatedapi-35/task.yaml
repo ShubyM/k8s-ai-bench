@@ -1,0 +1,21 @@
+script:
+- prompt: 'This policy prevents the use of `flowcontrol.apiserver.k8s.io/v1beta2`
+    API version for `FlowSchema` and `PriorityLevelConfiguration` resources. It enforces
+    the use of `flowcontrol.apiserver.k8s.io/v1beta3` for these resources on Kubernetes
+    version 1.29 and later.
+
+
+    Two resources have been deployed in namespace ''gk-test-035''. Examine them and
+    determine which resource(s) violate the policy.
+
+
+    After your analysis, output a single line starting with "VIOLATING:" followed
+    by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources
+    comply.'
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: 'VIOLATING:'
+- contains: resource-beta
+verifier: verify.sh

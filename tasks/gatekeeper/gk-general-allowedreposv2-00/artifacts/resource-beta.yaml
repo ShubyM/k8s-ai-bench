@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-beta
+spec:
+  containers:
+  - image: myregistry.azurecr.io.malicious.com/malicious-image
+    name: container-beta
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi
+  - image: myregistry.azurecr.io/nginx
+    name: container-beta-1
+    resources:
+      limits:
+        cpu: 200m
+        memory: 50Mi
+  - image: mydockerhubmalicious/python
+    name: container-beta-2
+    resources:
+      limits:
+        cpu: 50m
+        memory: 10Mi
+  - image: mydockerhub/python
+    name: container-beta-3
+    resources:
+      limits:
+        cpu: 50m
+        memory: 10Mi
