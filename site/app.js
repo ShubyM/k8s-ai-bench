@@ -89,12 +89,12 @@ function getModelWithIcon(modelName, linkUrl) {
     const displayName = getModelDisplayName(modelName);
     let iconHtml = '';
     if (lab.icon) {
-        iconHtml = '<img src="' + lab.icon + '" class="lab-icon" alt="' + lab.name + '" title="' + lab.name + '">';
+        iconHtml = '<img src="' + lab.icon + '" class="h-5 w-auto mr-2 flex-shrink-0" alt="' + lab.name + '" title="' + lab.name + '">';
     }
     if (linkUrl) {
-        return iconHtml + '<a href="' + linkUrl + '" class="model-link">' + displayName + '</a>';
+        return iconHtml + '<a href="' + linkUrl + '" class="text-blue-600 font-medium hover:text-blue-700 hover:underline">' + displayName + '</a>';
     }
-    return iconHtml + '<span class="model-name">' + displayName + '</span>';
+    return iconHtml + '<span class="font-semibold text-zinc-900">' + displayName + '</span>';
 }
 
 async function loadData() {
@@ -109,14 +109,14 @@ async function loadData() {
         if (window.renderPage) window.renderPage();
     } catch (err) {
         console.error(err);
-        const container = document.querySelector('.container');
+        const container = document.querySelector('main');
         if (container) {
             container.innerHTML =
-                '<div style="color:#cf222e; text-align:center; margin-top:50px; background:#fff; padding:2rem; border-radius:6px; border:1px solid #e1e4e8;">' +
-                '<h2>Error Loading Data</h2>' +
-                '<p>Could not fetch <code>' + DATA_URL + '</code>.</p>' +
-                '<p style="color:#57606a;"><strong>Note:</strong> If opening locally, you must run a local server (browsers block file:// access).</p>' +
-                '<code style="background:#f6f8fa; padding:5px; border-radius:4px;">python3 -m http.server</code>' +
+                '<div class="max-w-xl mx-auto mt-12 bg-white rounded-lg border border-zinc-200 p-8 text-center">' +
+                '<h2 class="text-xl font-semibold text-red-600 mb-4">Error Loading Data</h2>' +
+                '<p class="text-zinc-600 mb-2">Could not fetch <code class="bg-zinc-100 px-1.5 py-0.5 rounded text-sm">' + DATA_URL + '</code>.</p>' +
+                '<p class="text-zinc-500 text-sm mb-4"><strong>Note:</strong> If opening locally, you must run a local server (browsers block file:// access).</p>' +
+                '<code class="bg-zinc-100 px-3 py-2 rounded text-sm inline-block">python3 -m http.server</code>' +
                 '</div>';
         }
     }
@@ -255,22 +255,22 @@ function processData(rawData) {
 function getHue(percentage) { return (percentage / 100) * 120; }
 
 function createMiniBar(val, hue) {
-    return '<div style="height: 6px; width: 100%; background: #eee; border-radius: 3px; margin-top: 5px; overflow: hidden;"><div style="height: 100%; width: ' + val + '%; background-color: hsla(' + hue + ', 85%, 40%, 1.0);"></div></div>';
+    return '<div class="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width: ' + val + '%; background-color: hsl(' + hue + ', 85%, 40%);"></div></div>';
 }
 
 function createBar(val, hue) {
-    return '<div class="score-bar-wrapper"><div class="bar-segment" style="width: ' + val + '%; background-color: hsla(' + hue + ', 85%, 40%, 1.0);"></div></div>';
+    return '<div class="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width: ' + val + '%; background-color: hsl(' + hue + ', 85%, 40%);"></div></div>';
 }
 
 // Bar functions with model-specific colors
 function createModelBar(val, modelName) {
     const color = getModelColor(modelName);
-    return '<div class="score-bar-wrapper"><div class="bar-segment" style="width: ' + val + '%; background-color: ' + color + ';"></div></div>';
+    return '<div class="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width: ' + val + '%; background-color: ' + color + ';"></div></div>';
 }
 
 function createModelMiniBar(val, modelName) {
     const color = getModelColor(modelName);
-    return '<div style="height: 6px; width: 100%; background: #eee; border-radius: 3px; margin-top: 5px; overflow: hidden;"><div style="height: 100%; width: ' + val + '%; background-color: ' + color + ';"></div></div>';
+    return '<div class="flex-1 h-2 bg-zinc-100 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width: ' + val + '%; background-color: ' + color + ';"></div></div>';
 }
 
 function sortTable(table, colIndex) {

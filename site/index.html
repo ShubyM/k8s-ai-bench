@@ -4,76 +4,107 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>k8s-ai-bench Leaderboard</title>
-	<link rel="stylesheet" href="style.css">
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+				}
+			}
+		}
+	</script>
 	<script src="app.js"></script>
-	
 </head>
-<body>
-	<nav class="navbar">
-		<a href="index.html" class="nav-brand">k8s-ai-bench</a>
-		<div class="nav-links">
-			<a href="index.html" class="nav-btn active">Leaderboard</a>
-			<a href="tasks.html" class="nav-btn">Tasks</a>
-			<a href="about.html" class="nav-btn">About</a>
-			<a href="https://github.com/gke-labs/k8s-ai-bench" class="nav-btn" target="_blank">GitHub &nearr;</a>
+<body class="bg-zinc-50 text-zinc-900 font-sans min-h-screen flex flex-col">
+	<nav class="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+		<a href="index.html" class="text-white font-semibold text-lg hover:text-zinc-300 transition-colors">k8s-ai-bench</a>
+		<div class="flex items-center gap-2">
+			<a href="index.html" class="px-3 py-1.5 rounded-md text-sm font-medium bg-zinc-800 text-white">Leaderboard</a>
+			<a href="tasks.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Tasks</a>
+			<a href="about.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">About</a>
+			<a href="https://github.com/gke-labs/k8s-ai-bench" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 border border-zinc-700 hover:text-white hover:border-zinc-500 transition-colors" target="_blank">GitHub ↗</a>
 		</div>
 	</nav>
-	<div class="container">
-		
-		<h1>k8s-ai-bench Leaderboard</h1>
-		<div class="intro-container">
-			<div class="intro-row"><span class="intro-label">Goal:</span> Determine which LLM is best suited for solving Kubernetes tasks.</div>
-			<div class="intro-row"><span class="intro-label">Method:</span> Evaluation against specific tasks in the <a href="https://github.com/gke-labs/k8s-ai-bench" target="_blank" style="color: #0969da; text-decoration: none;">k8s-ai-bench</a> repository (totaling 120 execution runs per model).</div>
-			<div class="intro-row" style="margin-top: 10px; border-top: 1px dashed #e1e4e8; padding-top: 10px;">
-				<div class="intro-label" style="margin-bottom: 5px;">Metrics:</div>
-				<div class="metric-def"><strong>Pass@1:</strong> The probability of passing a task on the first try. This represents the average performance of the model.</div>
-				<div class="metric-def"><strong>Pass@5:</strong> The probability of passing a task within 5 tries. This represents the potential of the model.</div>
-				<div class="metric-def"><strong>Pass All 5:</strong> The percent of tasks that passed on every run.</div>
+
+	<main class="flex-1 max-w-5xl mx-auto px-6 py-8 w-full">
+		<h1 class="text-2xl font-semibold text-zinc-900 mb-6">k8s-ai-bench Leaderboard</h1>
+
+		<div class="bg-white rounded-lg border border-zinc-200 p-6 mb-8">
+			<div class="space-y-2 text-sm text-zinc-600">
+				<p><span class="font-semibold text-zinc-900">Goal:</span> Determine which LLM is best suited for solving Kubernetes tasks.</p>
+				<p><span class="font-semibold text-zinc-900">Method:</span> Evaluation against specific tasks in the <a href="https://github.com/gke-labs/k8s-ai-bench" target="_blank" class="text-blue-600 hover:text-blue-700 hover:underline">k8s-ai-bench</a> repository (totaling 120 execution runs per model).</p>
 			</div>
-		</div>
-		
-		<div class="controls-area">
-			<div class="control-row">
-				<span style="font-weight:600; font-size:0.9em;">Metric:</span>
-				<div class="toggle-group">
-					<button class="toggle-btn" onclick="setMetric('p1')" id="btn-p1">Pass@1</button>
-					<button class="toggle-btn active" onclick="setMetric('p5')" id="btn-p5">Pass@5</button>
-					<button class="toggle-btn" onclick="setMetric('pAll')" id="btn-pAll">Pass All 5</button>
+			<div class="border-t border-zinc-100 pt-4 mt-4">
+				<p class="font-semibold text-zinc-900 text-sm mb-2">Metrics:</p>
+				<div class="space-y-1 text-sm text-zinc-600">
+					<p><strong>Pass@1:</strong> The probability of passing a task on the first try. This represents the average performance of the model.</p>
+					<p><strong>Pass@5:</strong> The probability of passing a task within 5 tries. This represents the potential of the model.</p>
+					<p><strong>Pass All 5:</strong> The percent of tasks that passed on every run.</p>
 				</div>
 			</div>
-			<div class="control-row">
-				<span style="font-weight:600; font-size:0.9em;">Filter Models:</span>
-				<label class="checkbox-label"><input type="checkbox" id="chk-prop" checked onchange="renderPage()"> Proprietary</label>
-				<label class="checkbox-label"><input type="checkbox" id="chk-open" checked onchange="renderPage()"> Open Source</label>
-			</div>
-			<div class="disclaimer-box" id="pAll-disclaimer">
-				<strong>Note:</strong> We are still evaluating whether "Pass All 5" is a robust metric. It represents the percentage of tasks where the model succeeded in every single attempt (Consistency).
+		</div>
+
+		<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 mb-4 hidden" id="pAll-disclaimer">
+			<strong>Note:</strong> We are still evaluating whether "Pass@All" is a robust metric. It represents the percentage of tasks where the model succeeded in every single attempt (Consistency).
+		</div>
+
+		<div class="overflow-x-auto">
+			<div class="rounded-lg border border-zinc-200 overflow-hidden">
+				<table class="w-full" id="leaderboard-table">
+					<thead>
+						<tr class="bg-zinc-50 border-b border-zinc-200">
+							<th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide" style="width: 240px;">Model</th>
+							<th class="px-4 py-3 text-left">
+								<div class="flex items-center gap-3">
+									<span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Score</span>
+									<div class="bg-zinc-200 p-0.5 rounded-md inline-flex gap-0.5">
+										<button class="px-2 py-1 text-xs font-medium rounded transition-all toggle-btn text-zinc-500 hover:text-zinc-700" onclick="setMetric('p1')" id="btn-p1">Pass@1</button>
+										<button class="px-2 py-1 text-xs font-medium rounded transition-all toggle-btn bg-white text-zinc-900 shadow-sm" onclick="setMetric('p5')" id="btn-p5">Pass@5</button>
+										<button class="px-2 py-1 text-xs font-medium rounded transition-all toggle-btn text-zinc-500 hover:text-zinc-700" onclick="setMetric('pAll')" id="btn-pAll" title="Pass All 5 - Experimental metric">Pass@All</button>
+									</div>
+								</div>
+							</th>
+							<th class="px-4 py-3 text-left" style="width: 180px;">
+								<div class="flex flex-col gap-1.5">
+									<span class="text-xs font-medium text-zinc-500 uppercase tracking-wide">Type</span>
+									<div class="flex items-center gap-3">
+										<label class="flex items-center gap-1 text-xs text-zinc-600 cursor-pointer">
+											<input type="checkbox" id="chk-prop" checked onchange="renderPage()" class="w-3 h-3 rounded border-zinc-300 text-blue-600 focus:ring-blue-500">
+											Prop
+										</label>
+										<label class="flex items-center gap-1 text-xs text-zinc-600 cursor-pointer">
+											<input type="checkbox" id="chk-open" checked onchange="renderPage()" class="w-3 h-3 rounded border-zinc-300 text-blue-600 focus:ring-blue-500">
+											OSS
+										</label>
+									</div>
+								</div>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-zinc-100"></tbody>
+				</table>
 			</div>
 		</div>
-		
-		<div style="max-width: 900px; margin: 0 auto;">
-			<table id="leaderboard-table">
-				<thead>
-					<tr>
-						<th data-idx="0" style="width: 250px;">Model</th>
-						<th data-idx="1">Score</th>
-						<th data-idx="2" style="width: 100px;">Type</th>
-					</tr>
-				</thead>
-				<tbody></tbody>
-			</table>
-		</div>
-		<p style="text-align:center; color:#6e7781; margin-top: 2rem;">Click on a model name to view detailed logs.</p>
-		
+		<p class="text-sm text-zinc-500 text-center mt-6">Click on a model name to view detailed logs.</p>
+
 		<script>
 			let currentMetric = 'p5';
 			function setMetric(metric) {
 				currentMetric = metric;
-				document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-				document.getElementById('btn-' + metric).classList.add('active');
+				document.querySelectorAll('.toggle-btn').forEach(b => {
+					b.classList.remove('bg-white', 'text-zinc-900', 'shadow-sm');
+					b.classList.add('text-zinc-500', 'hover:text-zinc-700');
+				});
+				const activeBtn = document.getElementById('btn-' + metric);
+				activeBtn.classList.remove('text-zinc-500', 'hover:text-zinc-700');
+				activeBtn.classList.add('bg-white', 'text-zinc-900', 'shadow-sm');
+
 				const disclaimer = document.getElementById('pAll-disclaimer');
-				if (metric === 'pAll') disclaimer.classList.add('visible');
-				else disclaimer.classList.remove('visible');
+				if (metric === 'pAll') disclaimer.classList.remove('hidden');
+				else disclaimer.classList.add('hidden');
+
 				renderPage();
 			}
 			window.renderPage = function() {
@@ -81,25 +112,25 @@
 				const tbody = document.querySelector('#leaderboard-table tbody');
 				const showProp = document.getElementById('chk-prop').checked;
 				const showOpen = document.getElementById('chk-open').checked;
-				
+
 				let data = window.PROCESSED_DATA.leaderboard.filter(row => {
 					if (row.type === 'Proprietary' && !showProp) return false;
 					if (row.type === 'Open Source' && !showOpen) return false;
 					return true;
 				});
 				data.sort((a, b) => b[currentMetric] - a[currentMetric]);
-				
+
 				tbody.innerHTML = data.map(row => {
 					const val = row[currentMetric];
 					const modelCell = getModelWithIcon(row.id, 'model.html?id='+encodeURIComponent(row.id));
-					return '<tr><td class="model-cell">' + modelCell + '</td>' +
-						   '<td><div class="score-container"><div class="score-text" style="font-weight:bold;">'+val+'%</div>' +
+					const typeClass = row.type === 'Proprietary' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700';
+					return '<tr class="hover:bg-zinc-50 transition-colors"><td class="px-4 py-3"><div class="flex items-center">' + modelCell + '</div></td>' +
+						   '<td class="px-4 py-3"><div class="flex items-center gap-3"><span class="font-semibold text-zinc-900 w-12">'+val+'%</span>' +
 						   createModelBar(val, row.id) + '</div></td>' +
-						   '<td><span style="font-size:0.85em; color:#57606a;">'+row.type+'</span></td></tr>';
+						   '<td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs font-medium '+typeClass+'">'+row.type+'</span></td></tr>';
 				}).join('');
 			}
 		</script>
-	
-	</div>
+	</main>
 </body>
 </html>

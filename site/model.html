@@ -4,27 +4,39 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Model Details</title>
-	<link rel="stylesheet" href="style.css">
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+				}
+			}
+		}
+	</script>
 	<script src="app.js"></script>
-	
 </head>
-<body>
-	<nav class="navbar">
-		<a href="index.html" class="nav-brand">k8s-ai-bench</a>
-		<div class="nav-links">
-			<a href="index.html" class="nav-btn active">Leaderboard</a>
-			<a href="tasks.html" class="nav-btn">Tasks</a>
-			<a href="about.html" class="nav-btn">About</a>
-			<a href="https://github.com/gke-labs/k8s-ai-bench" class="nav-btn" target="_blank">GitHub &nearr;</a>
+<body class="bg-zinc-50 text-zinc-900 font-sans min-h-screen flex flex-col">
+	<nav class="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+		<a href="index.html" class="text-white font-semibold text-lg hover:text-zinc-300 transition-colors">k8s-ai-bench</a>
+		<div class="flex items-center gap-2">
+			<a href="index.html" class="px-3 py-1.5 rounded-md text-sm font-medium bg-zinc-800 text-white">Leaderboard</a>
+			<a href="tasks.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Tasks</a>
+			<a href="about.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">About</a>
+			<a href="https://github.com/gke-labs/k8s-ai-bench" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 border border-zinc-700 hover:text-white hover:border-zinc-500 transition-colors" target="_blank">GitHub ↗</a>
 		</div>
 	</nav>
-	<div class="container">
-		
-		<a href="index.html" class="back-link">&larr; Back to Leaderboard</a>
-		<h1 id="model-title">Loading...</h1>
-		<div class="controls-area" style="flex-direction: row; margin-bottom: 1rem;">
-			<span style="font-weight:600;">Run Filter:</span>
-			<select id="run-select" onchange="renderPage()" style="padding: 5px; font-size:1rem;">
+
+	<main class="flex-1 max-w-5xl mx-auto px-6 py-8 w-full">
+		<a href="index.html" class="inline-flex items-center gap-1 text-sm text-zinc-600 hover:text-zinc-900 mb-4 transition-colors">
+			<span>←</span> Back to Leaderboard
+		</a>
+		<h1 class="text-2xl font-semibold text-zinc-900 mb-6 flex items-center gap-2" id="model-title">Loading...</h1>
+
+		<div class="flex items-center gap-4 mb-6">
+			<span class="text-sm font-semibold text-zinc-700">Run Filter:</span>
+			<select id="run-select" onchange="renderPage()" class="border border-zinc-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
 				<option value="all">All Runs</option>
 				<option value="1">Run 1</option>
 				<option value="2">Run 2</option>
@@ -33,17 +45,23 @@
 				<option value="5">Run 5</option>
 			</select>
 		</div>
-		<table id="details-table">
-			<thead>
-				<tr>
-					<th data-idx="0" style="width: 30%;">Task Name</th>
-					<th data-idx="1" style="width: 10%;">Run #</th>
-					<th data-idx="2" style="width: 10%;">Result</th>
-					<th style="width: 50%;">Details</th>
-				</tr>
-			</thead>
-			<tbody></tbody>
-		</table>
+
+		<div class="overflow-x-auto">
+			<div class="rounded-lg border border-zinc-200 overflow-hidden">
+				<table class="w-full" id="details-table">
+					<thead>
+						<tr class="bg-zinc-50 border-b border-zinc-200">
+							<th data-idx="0" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 transition-colors" style="width: 30%;">Task Name</th>
+							<th data-idx="1" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 transition-colors" style="width: 10%;">Run #</th>
+							<th data-idx="2" class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide cursor-pointer hover:bg-zinc-100 transition-colors" style="width: 10%;">Result</th>
+							<th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wide" style="width: 50%;">Details</th>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-zinc-100"></tbody>
+				</table>
+			</div>
+		</div>
+
 		<script>
 			window.renderPage = function() {
 				if(!window.PROCESSED_DATA) return;
@@ -51,17 +69,17 @@
 				const modelId = params.get('id');
 				const data = window.PROCESSED_DATA.details[modelId];
 				const runFilter = document.getElementById('run-select').value;
-				
+
 				if (!data) {
 					document.getElementById('model-title').innerText = 'Model Not Found';
 					return;
 				}
 				const lab = getLabInfo(modelId);
 				const displayName = getModelDisplayName(modelId);
-				let iconHtml = lab.icon ? '<img src="' + lab.icon + '" class="lab-icon" alt="' + lab.name + '">' : '';
-				document.getElementById('model-title').innerHTML = iconHtml + ' ' + displayName;
+				let iconHtml = lab.icon ? '<img src="' + lab.icon + '" class="h-7 w-auto" alt="' + lab.name + '">' : '';
+				document.getElementById('model-title').innerHTML = iconHtml + displayName;
 				const tbody = document.querySelector('#details-table tbody');
-				
+
 				let filteredData = data;
 				if (runFilter !== 'all') {
 					const targetRun = parseInt(runFilter);
@@ -69,19 +87,20 @@
 				}
 
 				tbody.innerHTML = filteredData.map(row => {
-					const badgeClass = row.result === 'success' ? 'success' : 'fail';
-					let detailsHTML = '<span style="color:#999">-</span>';
+					const badgeClass = row.result === 'success'
+						? 'bg-emerald-50 text-emerald-700'
+						: 'bg-red-50 text-red-700';
+					let detailsHTML = '<span class="text-zinc-400">-</span>';
 					if (row.result === 'fail') {
 						const msg = row.message || "No failure message provided.";
-						detailsHTML = '<div class="failure-box"><div class="failure-msg">'+msg+'</div></div>';
+						detailsHTML = '<div class="bg-zinc-50 border border-zinc-200 rounded-md p-3 font-mono text-xs text-zinc-700 max-h-24 overflow-y-auto whitespace-pre-wrap">'+msg+'</div>';
 					}
-					return '<tr><td>'+row.task+'</td><td>'+row.run+'</td>' +
-						   '<td><span class="result-badge '+badgeClass+'">'+row.result+'</span></td>' +
-						   '<td>'+detailsHTML+'</td></tr>';
+					return '<tr class="hover:bg-zinc-50 transition-colors"><td class="px-4 py-3 font-medium text-zinc-900">'+row.task+'</td><td class="px-4 py-3 text-zinc-600">'+row.run+'</td>' +
+						   '<td class="px-4 py-3"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium '+badgeClass+'">'+row.result+'</span></td>' +
+						   '<td class="px-4 py-3">'+detailsHTML+'</td></tr>';
 				}).join('');
 			}
 		</script>
-	
-	</div>
+	</main>
 </body>
 </html>

@@ -4,31 +4,66 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>About</title>
-	<link rel="stylesheet" href="style.css">
+	<script src="https://cdn.tailwindcss.com"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<script>
+		tailwind.config = {
+			theme: {
+				extend: {
+					fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+				}
+			}
+		}
+	</script>
 	<script src="app.js"></script>
-	
 </head>
-<body>
-	<nav class="navbar">
-		<a href="index.html" class="nav-brand">k8s-ai-bench</a>
-		<div class="nav-links">
-			<a href="index.html" class="nav-btn">Leaderboard</a>
-			<a href="tasks.html" class="nav-btn">Tasks</a>
-			<a href="about.html" class="nav-btn active">About</a>
-			<a href="https://github.com/gke-labs/k8s-ai-bench" class="nav-btn" target="_blank">GitHub &nearr;</a>
+<body class="bg-zinc-50 text-zinc-900 font-sans min-h-screen flex flex-col">
+	<nav class="bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+		<a href="index.html" class="text-white font-semibold text-lg hover:text-zinc-300 transition-colors">k8s-ai-bench</a>
+		<div class="flex items-center gap-2">
+			<a href="index.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Leaderboard</a>
+			<a href="tasks.html" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Tasks</a>
+			<a href="about.html" class="px-3 py-1.5 rounded-md text-sm font-medium bg-zinc-800 text-white">About</a>
+			<a href="https://github.com/gke-labs/k8s-ai-bench" class="px-3 py-1.5 rounded-md text-sm font-medium text-zinc-400 border border-zinc-700 hover:text-white hover:border-zinc-500 transition-colors" target="_blank">GitHub ↗</a>
 		</div>
 	</nav>
-	<div class="container">
-		
-		<div class="container" style="max-width: 800px;">
-			<h1>About Project</h1>
-			<div style="background: white; padding: 2rem; border: 1px solid #dfe2e5; border-radius: 6px; line-height: 1.6;">
-				<p><strong>k8s-ai-bench</strong> is a benchmarking tool designed to evaluate Large Language Models (LLMs) on their ability to interact with and manage Kubernetes clusters.</p>
-				<h3>How it works</h3>
-				<p>The benchmark runs a series of 24 predefined tasks against different LLMs. Each task is attempted multiple times to gauge consistency and potential.</p>
+
+	<main class="flex-1 max-w-3xl mx-auto px-6 py-8 w-full">
+		<h1 class="text-2xl font-semibold text-zinc-900 mb-6">About k8s-ai-bench</h1>
+
+		<div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-6">
+			<p class="text-zinc-600 leading-relaxed">
+				<strong class="text-zinc-900">k8s-ai-bench</strong> is a benchmarking tool designed to evaluate Large Language Models (LLMs) on their ability to interact with and manage Kubernetes clusters.
+			</p>
+
+			<div>
+				<h2 class="text-lg font-semibold text-zinc-900 mb-3">How it works</h2>
+				<p class="text-zinc-600 leading-relaxed">
+					The benchmark runs a series of 24 predefined tasks against different LLMs. Each task is attempted multiple times to gauge consistency and potential.
+				</p>
+			</div>
+
+			<div>
+				<h2 class="text-lg font-semibold text-zinc-900 mb-3">Metrics</h2>
+				<ul class="space-y-2 text-zinc-600">
+					<li><strong class="text-zinc-900">Pass@1:</strong> Probability of passing on the first attempt</li>
+					<li><strong class="text-zinc-900">Pass@5:</strong> Probability of passing within 5 attempts</li>
+					<li><strong class="text-zinc-900">Pass All 5:</strong> Percentage of tasks passed on every single run</li>
+				</ul>
+			</div>
+
+			<div class="border-t border-zinc-100 pt-6">
+				<h2 class="text-lg font-semibold text-zinc-900 mb-3">Links</h2>
+				<ul class="space-y-2">
+					<li>
+						<a href="https://github.com/gke-labs/k8s-ai-bench" class="text-blue-600 hover:text-blue-700 hover:underline" target="_blank">k8s-ai-bench Repository ↗</a>
+					</li>
+					<li>
+						<a href="https://github.com/GoogleCloudPlatform/kubectl-ai" class="text-blue-600 hover:text-blue-700 hover:underline" target="_blank">kubectl-ai Repository ↗</a>
+					</li>
+				</ul>
 			</div>
 		</div>
-	
-	</div>
+	</main>
 </body>
 </html>
