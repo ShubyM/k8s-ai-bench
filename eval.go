@@ -267,6 +267,25 @@ func getLastNLines(s string, n int) (string, bool) {
 	return s, false
 }
 
+func stripANSI(str string) string {
+	const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+	re := regexp.MustCompile(ansi)
+	return re.ReplaceAllString(str, "")
+}
+
+func findViolatingLine(text string) (string, bool) {
+	// Look for line starting with VIOLATING:
+	lines := strings.Split(text, "\n")
+	// Search backwards
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		if strings.HasPrefix(line, "VIOLATING:") {
+			return line, true
+		}
+	}
+	return "", false
+}
+
 func evaluateTask(ctx context.Context, config EvalConfig, taskID string, task Task, llmConfig model.LLMConfig, log io.Writer) model.TaskResult {
 	result := model.TaskResult{
 		Task:      taskID,
@@ -356,21 +375,47 @@ func evaluateTask(ctx context.Context, config EvalConfig, taskID string, task Ta
 
 	if len(task.Expect) > 0 {
 		// find the output after the last run command and search it
+		// Check for explicit XML answer tags first
 		var lastCmdOutput string
-		lastToolRunIndex := strings.LastIndex(agentOutput, "Running:")
-		if lastToolRunIndex == -1 {
-			// if no tool run found, parse the entire output
-			lastCmdOutput = agentOutput
+		answerStart := strings.LastIndex(agentOutput, "<answer>")
+		answerEnd := strings.LastIndex(agentOutput, "</answer>")
+
+		if answerStart != -1 && answerEnd != -1 && answerEnd > answerStart {
+			// Extract strictly what is inside the answer tags
+			lastCmdOutput = agentOutput[answerStart+len("<answer>") : answerEnd]
 		} else {
-			remaining := agentOutput[lastToolRunIndex:]
-			newlineIndex := strings.Index(remaining, "\n")
-			if newlineIndex != -1 {
-				lastCmdOutput = remaining[newlineIndex+1:]
+			// Fallback: Check for VIOLATING: pattern (standard for these tasks)
+			// This saves us if model forgets tags but still outputs the answer
+			if val, ok := findViolatingLine(agentOutput); ok {
+				lastCmdOutput = val
+			} else {
+				// Final Fallback: find the output after the last tool run command
+				// (This is risky as it might capture tool logs if answer is elusive)
+				lastToolRunIndex := strings.LastIndex(agentOutput, "Running:")
+				if lastToolRunIndex == -1 {
+					// if no tool run found, parse the entire output
+					lastCmdOutput = agentOutput
+				} else {
+					remaining := agentOutput[lastToolRunIndex:]
+					newlineIndex := strings.Index(remaining, "\n")
+					if newlineIndex != -1 {
+						lastCmdOutput = remaining[newlineIndex+1:]
+					}
+				}
 			}
-			// if no newline, lastCmdOutput is empty string
 		}
 
+		lastCmdOutput = stripANSI(lastCmdOutput)
+
 		for _, expect := range task.Expect {
+			if expect.Answer != "" {
+				if strings.TrimSpace(lastCmdOutput) != expect.Answer {
+					expectationFailures = append(expectationFailures, model.Failure{
+						Message: fmt.Sprintf("expected exact answer %q, but got %q", expect.Answer, strings.TrimSpace(lastCmdOutput)),
+					})
+				}
+			}
+
 			if expect.Contains != "" {
 				re, err := regexp.Compile(expect.Contains)
 				if err != nil {

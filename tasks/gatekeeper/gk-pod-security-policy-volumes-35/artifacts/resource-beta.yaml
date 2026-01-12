@@ -6,12 +6,12 @@ metadata:
   name: resource-beta
 spec:
   containers:
-  - image: nginx
+  - image: nginxinc/nginx-unprivileged:latest
     name: container-beta
     volumeMounts:
     - mountPath: /cache
       name: cache-volume
-  - image: nginx
+  - image: nginxinc/nginx-unprivileged:latest
     name: container-beta-1
     volumeMounts:
     - mountPath: /cache2

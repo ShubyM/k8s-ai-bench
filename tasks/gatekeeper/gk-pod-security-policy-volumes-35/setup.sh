@@ -8,4 +8,3 @@ kubectl apply -f artifacts/resource-beta.yaml -n gk-test-035
 echo "Waiting for resources to be ready..."
 kubectl wait --for=condition=Ready pod/resource-alpha -n gk-test-035 --timeout=120s
 kubectl wait --for=condition=Ready pod/resource-beta -n gk-test-035 --timeout=120s
-kubectl get all,ingress,networkpolicy,serviceaccount,role,rolebinding,configmap,secret -n gk-test-035

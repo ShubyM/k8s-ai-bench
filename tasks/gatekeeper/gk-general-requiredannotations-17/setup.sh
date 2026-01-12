@@ -6,4 +6,3 @@ kubectl apply -f artifacts/resource-alpha.yaml -n gk-test-017
 kubectl apply -f artifacts/resource-beta.yaml -n gk-test-017
 echo "Resources deployed. Waiting for readiness..."
 sleep 3
-kubectl get all,ingress,networkpolicy,serviceaccount,role,rolebinding,configmap,secret -n gk-test-017

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    owner: me.agilebank.demo
+  name: resource-alpha
+spec:
+  containers:
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx:latest
+    name: container-alpha
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi
+    securityContext:
+      capabilities:
+        add:
+        - something
+        drop:
+        - must_drop
+        - another_one

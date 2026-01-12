@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: resource-alpha
+spec:
+  containers:
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx:latest
+    name: container-alpha
+    resources:
+      limits:
+        memory: 1Gi
