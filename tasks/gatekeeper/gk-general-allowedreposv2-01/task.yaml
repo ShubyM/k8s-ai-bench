@@ -5,7 +5,7 @@ expect:
 - contains: VIOLATING:.*resource-beta.*
   notContains: resource-alpha
 script:
-- prompt: "This policy requires all Pods in the `default` namespace to use container\
+- prompt: "This policy requires all Pods in the `gk-test-001` namespace to use container\
     \ images from specific, allowed repositories.  Specifically, only images from\
     \ `openpolicyagent`, `myregistry.azurecr.io`, `mydockerhub`, `ubuntu:20.14`, or\
     \ `123456789123.dkr.ecr.eu-west-1.amazonaws.com/postgres` are permitted.\n   \
