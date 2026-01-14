@@ -102,7 +102,6 @@ func (s *ScriptStep) ResolvePrompt(baseDir string) (string, error) {
 type Expectation struct {
 	Contains    string `json:"contains,omitempty"`
 	NotContains string `json:"not_contains,omitempty"`
-	Answer      string `json:"answer,omitempty"`
 }
 
 type EvalConfig struct {
