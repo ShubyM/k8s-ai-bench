@@ -7,6 +7,6 @@ metadata:
 spec:
   containers:
   - image: nginx
-    name: container-beta-0
+    name: nginx
     stdin: true
     tty: true

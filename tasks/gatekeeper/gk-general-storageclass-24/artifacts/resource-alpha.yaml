@@ -1,3 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: somestorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -11,6 +18,13 @@ spec:
   storageClassName: somestorageclass
   volumeMode: Filesystem
 
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: somestorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -28,12 +42,11 @@ spec:
         app: app-alpha
     spec:
       containers:
-      - image: nginx:latest
+      - image: registry.k8s.io/nginx-slim:0.8
         name: main
         volumeMounts:
         - mountPath: /usr/share/nginx/html
           name: data
-      terminationGracePeriodSeconds: 0
   volumeClaimTemplates:
   - metadata:
       name: data

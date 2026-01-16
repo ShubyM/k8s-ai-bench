@@ -4,5 +4,16 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest
-    name: container-beta-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx:latest
+    name: opa
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

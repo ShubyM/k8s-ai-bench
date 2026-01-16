@@ -6,12 +6,16 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest # Changed image to nginx to pass basic validation. Policy requires cpu limit of 200m, so we provide 100m, keeping it non-compliant. Using 'latest' tag for broader compatibility.
-    name: container-beta-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx
+    name: opa
     resources:
       limits:
-        cpu: 100m # Violates the policy - limit should be 200m
-        memory: 2Gi # Exceeds policy requirement of 1Gi
+        cpu: 100m
+        memory: 2Gi
       requests:
-        cpu: 50m
+        cpu: 100m
         memory: 1Gi

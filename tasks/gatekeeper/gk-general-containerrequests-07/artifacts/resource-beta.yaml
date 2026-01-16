@@ -6,9 +6,12 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest
-    name: container-beta-0
+  - image: nginx
+    name: nginx
     resources:
+      limits:
+        cpu: 200m
+        memory: 4Gi
       requests:
         cpu: 100m
         memory: 2Gi

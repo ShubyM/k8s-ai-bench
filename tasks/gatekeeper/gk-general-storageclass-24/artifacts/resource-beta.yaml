@@ -1,3 +1,10 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: badstorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -12,6 +19,13 @@ spec:
   volumeMode: Filesystem
 
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: somestorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -25,10 +39,63 @@ spec:
   volumeMode: Filesystem
 
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: somestorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: resource-beta-2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app-beta
+  serviceName: novolumeclaimstorageclass
+  template:
+    metadata:
+      labels:
+        app: app-beta
+    spec:
+      containers:
+      - image: registry.k8s.io/nginx-slim:0.8
+        name: main
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: badstorageclass
+  namespace: ''
+provisioner: kubernetes.io/no-provisioner
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: resource-beta-3
 spec:
   replicas: 1
   selector:
@@ -46,6 +113,9 @@ spec:
         volumeMounts:
         - mountPath: /usr/share/nginx/html
           name: data
+      securityContext:
+        runAsGroup: 1000
+        runAsUser: 1000
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -56,35 +126,3 @@ spec:
         requests:
           storage: 1Gi
       storageClassName: badstorageclass
-
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: resource-beta-3
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: app-beta
-  serviceName: novolumeclaimstorageclass
-  template:
-    metadata:
-      labels:
-        app: app-beta
-    spec:
-      containers:
-      - image: registry.k8s.io/nginx-slim:0.8
-        name: main
-        volumeMounts:
-        - mountPath: /usr/share/nginx/html
-          name: data
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi

@@ -4,8 +4,10 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest
-    name: container-beta-0
+  - image: nginx
+    name: opa
     resources:
       limits:
+        memory: 2Gi
+      requests:
         memory: 2Gi

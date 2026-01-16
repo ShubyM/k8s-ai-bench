@@ -25,7 +25,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
 	"github.com/gke-labs/k8s-ai-bench/pkg/model"
 	"sigs.k8s.io/yaml"
 )
@@ -153,7 +152,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s <command> [options]\n\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "Commands:\n")
 	fmt.Fprintf(os.Stderr, "  run       Run evaluation benchmarks\n")
-	fmt.Fprintf(os.Stderr, "  analyze   Analyze results from previous benchmark runs\n\n")
+	fmt.Fprintf(os.Stderr, "  analyze   Analyze results from previous benchmark runs\n")
+	fmt.Fprintf(os.Stderr, "  validate  Validate Gatekeeper tasks using gator\n\n")
 	fmt.Fprintf(os.Stderr, "Run '%s <command> --help' for more information on a command.\n", os.Args[0])
 }
 
@@ -163,8 +163,8 @@ func kindClusterExists(clusterName string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to run 'kind get clusters': %w", err)
 	}
-	clusters := strings.Split(string(output), "\n")
-	for _, cluster := range clusters {
+	clusters := strings.SplitSeq(string(output), "\n")
+	for cluster := range clusters {
 		if cluster == clusterName {
 			return true, nil
 		}
@@ -227,9 +227,11 @@ func run(ctx context.Context) error {
 		return runEvals(ctx)
 	case "analyze":
 		return runAnalyze()
+	case "validate":
+		return runValidate()
 	default:
 		printUsage()
-		return fmt.Errorf("unknown subcommand: %s, valid options are 'run' or 'analyze'", subCommand)
+		return fmt.Errorf("unknown subcommand: %s, valid options are 'run' or 'analyze', or 'validate'", subCommand)
 	}
 }
 

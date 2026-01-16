@@ -5,8 +5,11 @@ metadata:
 spec:
   containers:
   - image: nginx
-    name: container-alpha-0
+    name: opa
     resources:
       limits:
-        cpu: "1"
-        memory: 2Gi
+        cpu: 1
+        memory: 1Gi
+      requests:
+        cpu: 1
+        memory: 1Gi

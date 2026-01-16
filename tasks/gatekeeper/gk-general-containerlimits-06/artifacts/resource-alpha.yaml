@@ -6,12 +6,12 @@ metadata:
   name: resource-alpha-0
 spec:
   containers:
-  - image: nginx:1.25 # Choose a tag that allows the pod, if the policy checks the image
-    name: container-alpha-0
+  - image: nginx
+    name: opa
     resources:
       limits:
-        cpu: 200m # Modified to comply with the policy
+        cpu: 200m
         memory: 1Gi
       requests:
-        cpu: 100m
-        memory: 512Mi # Added requests section and ensuring it is not greater than limits
+        cpu: 200m
+        memory: 1Gi

@@ -5,13 +5,16 @@ expect:
 - contains: VIOLATING:.*resource-beta.*
   notContains: resource-alpha
 script:
-- prompt: "This policy requires that all Pods define CPU requests of at least 200\
-    \ millicores and memory requests of at least 1 GiB. Pods lacking these minimum\
-    \ resource requests will be rejected.\n    \nLook at the resources that have been\
-    \ deployed in namespace gk-test-007. Examine them and determine which resource(s)\
-    \ violate the policy.\n\nAfter your analysis, output a single line starting with\
-    \ \"VIOLATING:\" followed by the resource name(s) that violate the policy, or\
-    \ \"VIOLATING: none\" if all resources comply.\nThe output format must be EXACTLY\
-    \ as follows, with no leading whitespace or extra text:\nVIOLATING: resource-name-1,\
-    \ resource-name-2\n\nIMPORTANT: You must NOT output anything other than the XML\
-    \ block below in your final response.\n<answer>VIOLATING: your-answer-here</answer>"
+- prompt: 'Hey, can you check if I have any resources in the ''gk-test-007'' namespace
+    that containers should request at least a certain amount of CPU and memory.? I
+    need to make sure we''re following our internal rules.
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

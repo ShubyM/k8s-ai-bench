@@ -4,5 +4,16 @@ metadata:
   name: resource-alpha-0
 spec:
   containers:
-  - image: nginx@sha256:f151f5e87609343b97c05b1a0a4e216c490913e9513f2a31c1cf8c5e96d7218b
-    name: container-alpha-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx@sha256:f79883440a50a447202e3804b2381b5c264f468f53ffcd55a50b7c2e37b6ad61
+    name: opa
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi

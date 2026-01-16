@@ -1,3 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.14.2
+        name: nginx
+---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -8,7 +25,7 @@ spec:
   - resource:
       name: cpu
       target:
-        averageUtilization: 900
+        averageUtilization: 90
         type: Utilization
     type: Resource
   minReplicas: 2
@@ -16,7 +33,53 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: nginx-deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.14.2
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.14.2
+        name: nginx
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -28,7 +91,7 @@ spec:
   - resource:
       name: cpu
       target:
-        averageUtilization: 900
+        averageUtilization: 90
         type: Utilization
     type: Resource
   minReplicas: 4
@@ -36,7 +99,53 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: nginx-deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nginx
+  name: nginx-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment-missing
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx:1.14.2
+        name: nginx
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

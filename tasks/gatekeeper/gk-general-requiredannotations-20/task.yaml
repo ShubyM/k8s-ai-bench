@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Hey, can you check if I have any resources in the ''gk-test-020'' namespace
+    that Services must have a valid owner and runbook annotation.? I need to make
+    sure we''re following our internal rules.
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

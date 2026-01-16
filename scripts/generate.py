@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import time
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -28,8 +29,14 @@ EXCLUDED_POLICIES = [
     "allowedrepos",               # users preferred v2
 ]
 
+# Resources that should NOT be renamed by neutralize_manifest
+PRESERVED_NAMES = {
+    "system:aggregate-to-edit",
+}
+
 IMAGE_FIXES = {
     "openpolicyagent/opa": "nginx:latest",
+    "nginx:latest": "nginx:1.14.2",
 }
 
 GEMINI_MODEL = "gemini-2.0-flash"
@@ -156,7 +163,9 @@ def generate_policy_description(constraint_yaml: str) -> str | None:
         log.warning("No GEMINI_API_KEY set, skipping description generation")
         return None
 
-    prompt = f"""Describe this Gatekeeper constraint policy in plain English. Be concise (2-3 sentences). Focus on what the policy requires/forbids. Don't mention Gatekeeper or Kubernetes jargon.
+    prompt = f"""Explain what this policy is checking for in a simple, natural phrase.
+Example: "don't have an owner label" or "use a disallowed image registry" or "have too many replicas".
+Do not use technical jargon or start with "This policy...". Just the phrase.
 
 {constraint_yaml}"""
 
@@ -206,6 +215,9 @@ Your Task:
    - Ensure resources.requests <= resources.limits
    - Remove invalid securityContext settings
    - Fix any invalid fields
+   - IF the resource relies on another resource (e.g. HPA needs Deployment, Ingress needs Service), ensure that dependent resource is VALID or added.
+   - **CRITICAL**: PRESERVE ALL LABELS AND SELECTORS. Do not remove any labels even if they seem useless (e.g. foo: bar).
+   - If adding a PodDisruptionBudget, prefer `maxUnavailable: 1` instead of `minAvailable` to avoid violations with single-replica deployments.
 
 3. Return ONLY the cleaned, valid YAML block. No explanations."""
 
@@ -235,12 +247,23 @@ Your Task:
 
 # === Task Creation ===
 
-def neutralize_manifest(manifest: str, suffix: str, index: int) -> str:
+def neutralize_manifest(manifest: str, suffix: str, index: int, policy_name: str = "") -> str:
     """Neutralize manifest names to ensure uniqueness across tests."""
     docs = list(yaml.safe_load_all(manifest))
+    new_docs = []
     for doc in docs:
-        if not doc or "metadata" not in doc:
+        if not doc:
             continue
+        
+        if "metadata" not in doc:
+            new_docs.append(doc)
+            continue
+        
+        name = doc["metadata"].get("name", "")
+        if name in PRESERVED_NAMES:
+            new_docs.append(doc)
+            continue
+            
         doc["metadata"]["name"] = f"resource-{suffix}-{index}"
         doc["metadata"].pop("namespace", None)
 
@@ -259,7 +282,137 @@ def neutralize_manifest(manifest: str, suffix: str, index: int) -> str:
             tmpl_meta = spec["template"].get("metadata", {})
             if "labels" in tmpl_meta and "app" in tmpl_meta["labels"]:
                 tmpl_meta["labels"]["app"] = new_app_label
+        
+        new_docs.append(doc)
 
+    return yaml.dump_all(new_docs, default_flow_style=False)
+
+def apply_image_fixes(manifest_str: str, policy_name: str, is_allowed: bool) -> str:
+    """Replace problematic images with standard ones."""
+    # Don't fix images for disallowedtags beta resources as they rely on bad tags
+    if "disallowedtags" in policy_name and not is_allowed:
+        return manifest_str
+        
+    for bad, good in IMAGE_FIXES.items():
+        manifest_str = manifest_str.replace(bad, good)
+    return manifest_str
+
+def inject_dependencies(manifest_str: str, policy_name: str, is_allowed: bool) -> str:
+    """Inject required dependencies or fix fields based on policy knowledge."""
+    docs = list(yaml.safe_load_all(manifest_str))
+    new_docs = []
+    
+    # Track existing kinds to avoid duplicates if possible
+    existing_kinds = {doc.get("kind") for doc in docs if doc}
+    
+    for doc in docs:
+        if not doc:
+            continue
+        
+        kind = doc.get("kind", "")
+        spec = doc.get("spec", {})
+        
+        # 1. HPA -> Deployment
+        if kind == "HorizontalPodAutoscaler":
+            scale_target = spec.get("scaleTargetRef", {})
+            target_kind = scale_target.get("kind", "Deployment")
+            target_name = scale_target.get("name", "nginx-deployment")
+            
+            # Ensure target name is set if missing
+            if "name" not in scale_target:
+                scale_target["name"] = target_name
+                doc["spec"]["scaleTargetRef"] = scale_target
+            
+            if target_kind == "Deployment":
+                dep_yaml = f"""
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{target_name}}
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.14.2
+""".format(target_name=target_name)
+                new_docs.append(yaml.safe_load(dep_yaml))
+
+        # 2. Ingress HTTPS -> TLS
+        if "httpsonly" in policy_name and kind == "Ingress":
+            if "tls" not in spec:
+                spec["tls"] = [{
+                    "hosts": ["example.com"],
+                    "secretName": "example-tls"
+                }]
+                doc["spec"] = spec
+        
+        # 3. StorageClass Inventory Mocking
+        if "storageclass" in policy_name:
+            sc_name = ""
+            if kind == "PersistentVolumeClaim":
+                sc_name = spec.get("storageClassName", "somestorageclass")
+            elif kind == "StatefulSet":
+                vcts = spec.get("volumeClaimTemplates", [])
+                if vcts:
+                    sc_name = vcts[0].get("spec", {}).get("storageClassName", "somestorageclass")
+            
+            if sc_name and sc_name != "manual": # manual usually means no class
+                sc_yaml = f"""
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{sc_name}}
+  namespace: ""
+provisioner: kubernetes.io/no-provisioner
+""".format(sc_name=sc_name)
+                new_docs.append(yaml.safe_load(sc_yaml))
+
+        # 5. Force name for block-endpoint-edit-default-role
+        if "block-endpoint-edit-default-role" in policy_name and kind == "ClusterRole":
+             doc["metadata"]["name"] = "system:aggregate-to-edit"
+
+    # Add original docs
+    new_docs.extend(docs)
+    return yaml.dump_all(new_docs, default_flow_style=False)
+
+def handle_uniqueness_checks(manifest_str: str, policy_name: str, is_beta: bool) -> str:
+    """Duplicate resources to create conflicts for uniqueness policies."""
+    if not is_beta:
+        return manifest_str
+    
+    if "unique" not in policy_name:
+        return manifest_str
+
+    docs = list(yaml.safe_load_all(manifest_str))
+    
+    # Check if we need duplication (if checking uniqueness of ingress or service)
+    # Even if multiple docs exist, they might not conflict. So we duplicate relevant ones.
+    
+    docs_to_add = []
+    for doc in docs:
+        if not doc:
+            continue
+        kind = doc.get("kind")
+        should_duplicate = False
+        
+        if "ingress" in policy_name and kind == "Ingress":
+            should_duplicate = True
+        elif "service" in policy_name and kind == "Service":
+            should_duplicate = True
+            
+        if should_duplicate:
+            doc2 = copy.deepcopy(doc)
+            doc2["metadata"]["name"] = doc["metadata"]["name"] + "-conflict"
+            docs_to_add.append(doc2)
+    
+    docs.extend(docs_to_add)
     return yaml.dump_all(docs, default_flow_style=False)
 
 
@@ -316,16 +469,13 @@ exit 0
             "notContains": "resource-alpha"
         }],
         "script": [{
-            "prompt": f"""{description}
+            "prompt": f"""Hey, can you check if I have any resources in the '{namespace}' namespace that {description}? I need to make sure we're following our internal rules.
 
-Look at the resources that have been deployed in namespace {namespace}. Examine them and determine which resource(s) violate the policy.
+If you find any, list them in this format:
+VIOLATING: resource_name, resource_name
 
-After your analysis, output a single line starting with "VIOLATING:" followed by the resource name(s) that violate the policy, or "VIOLATING: none" if all resources comply.
-The output format must be EXACTLY as follows, with no leading whitespace or extra text:
-VIOLATING: resource-name-1, resource-name-2
-
-IMPORTANT: You must NOT output anything other than the XML block below in your final response.
-<answer>VIOLATING: your-answer-here</answer>"""
+Otherwise, just output:
+VIOLATING: none"""
         }]
     }
     (task_dir / "task.yaml").write_text(yaml.dump(task_config, default_flow_style=False, sort_keys=False))
@@ -364,27 +514,28 @@ def process_template(
         # Neutralize and fix manifests
         allowed_parts = []
         for i, manifest in enumerate(sample.allowed_manifests):
-            neutralized = neutralize_manifest(manifest, "alpha", i)
+            neutralized = neutralize_manifest(manifest, "alpha", i, template.name)
             fixed = fix_manifest_for_kind(neutralized, description, template.name, is_allowed=True)
-            if fixed:
-                allowed_parts.append(fixed)
-            else:
-                allowed_parts.append(neutralized)
+            # Apply our python-based fixes
+            processed = inject_dependencies(fixed if fixed else neutralized, template.name, is_allowed=True)
+            processed = apply_image_fixes(processed, template.name, is_allowed=True)
+            allowed_parts.append(processed)
 
         disallowed_parts = []
         for i, manifest in enumerate(sample.disallowed_manifests):
-            neutralized = neutralize_manifest(manifest, "beta", i)
+            neutralized = neutralize_manifest(manifest, "beta", i, template.name)
             fixed = fix_manifest_for_kind(neutralized, description, template.name, is_allowed=False)
-            if fixed:
-                disallowed_parts.append(fixed)
-            else:
-                disallowed_parts.append(neutralized)
+            # Apply our python-based fixes
+            processed = inject_dependencies(fixed if fixed else neutralized, template.name, is_allowed=False)
+            processed = apply_image_fixes(processed, template.name, is_allowed=False)
+            processed = handle_uniqueness_checks(processed, template.name, is_beta=True)
+            disallowed_parts.append(processed)
 
         alpha_manifest = "\n---\n".join(allowed_parts)
         beta_manifest = "\n---\n".join(disallowed_parts)
 
         try:
-            create_task_directory(
+            task_dir = create_task_directory(
                 output_dir=output_dir,
                 task_name=task_name,
                 namespace=namespace,
@@ -392,6 +543,9 @@ def process_template(
                 alpha_manifest=alpha_manifest,
                 beta_manifest=beta_manifest,
             )
+            # Copy constraint.yaml to artifacts
+            (task_dir / "artifacts" / "constraint.yaml").write_text(sample.constraint_yaml)
+            
             results.append(GenerationResult(task_name=task_name, success=True))
             log.info(f"Generated: {task_name}")
         except Exception as e:

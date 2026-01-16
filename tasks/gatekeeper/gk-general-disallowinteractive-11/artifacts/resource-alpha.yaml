@@ -7,6 +7,6 @@ metadata:
 spec:
   containers:
   - image: nginx
-    name: container-alpha-0
+    name: nginx
     stdin: false
     tty: false
