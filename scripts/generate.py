@@ -5,12 +5,12 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 import time
 import copy
 from dataclasses import dataclass
 from pathlib import Path
-
-import requests
+import google.genai as genai  # type: ignore
 import yaml
 
 # === Constants ===
@@ -38,6 +38,23 @@ IMAGE_FIXES = {
     "openpolicyagent/opa": "nginx:latest",
     "nginx:latest": "nginx:1.14.2",
 }
+
+CLUSTER_SCOPED_KINDS = {
+    "APIService",
+    "ClusterRole",
+    "ClusterRoleBinding",
+    "CustomResourceDefinition",
+    "MutatingWebhookConfiguration",
+    "Namespace",
+    "Node",
+    "PersistentVolume",
+    "PodSecurityPolicy",
+    "StorageClass",
+    "ValidatingWebhookConfiguration",
+}
+
+GATOR_TIMEOUT_SECONDS = 30
+VERIFY_GATOR = os.environ.get("VERIFY_GATOR", "1") != "0"
 
 GEMINI_MODEL = "gemini-2.0-flash"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -157,10 +174,37 @@ def load_samples(template: ConstraintTemplate) -> list[Sample]:
 
 # === AI Generation ===
 
+_GENAI_CLIENT = None
+
+
+def get_genai_client():
+    global _GENAI_CLIENT
+    if _GENAI_CLIENT is None:
+        _GENAI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+    return _GENAI_CLIENT
+
+
+def generate_with_gemini(prompt: str) -> str | None:
+    client = get_genai_client()
+
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+        )
+    except Exception as exc:
+        log.warning(f"Gemini API exception: {exc}")
+        return None
+
+    text = getattr(response, "text", None)
+    if not text:
+        return None
+    return text.strip()
+
+
 def generate_policy_description(constraint_yaml: str) -> str | None:
     """Use Gemini to generate a natural language description of the constraint."""
     if not GEMINI_API_KEY:
-        log.warning("No GEMINI_API_KEY set, skipping description generation")
         return None
 
     prompt = f"""Explain what this policy is checking for in a simple, natural phrase.
@@ -169,22 +213,16 @@ Do not use technical jargon or start with "This policy...". Just the phrase.
 
 {constraint_yaml}"""
 
-    try:
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}",
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=30,
-        )
-        if resp.ok:
-            return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        log.warning(f"Gemini API error: {resp.status_code}")
-    except Exception as e:
-        log.warning(f"Gemini API exception: {e}")
-
-    return None
+    return generate_with_gemini(prompt)
 
 
-def fix_manifest_for_kind(manifest: str, policy_desc: str, policy_name: str, is_allowed: bool) -> str | None:
+def fix_manifest_for_kind(
+    manifest: str,
+    policy_desc: str,
+    policy_name: str,
+    constraint_yaml: str,
+    is_allowed: bool,
+) -> str | None:
     """Use Gemini to fix manifest to be deployable on Kind while preserving test logic."""
     if not GEMINI_API_KEY:
         return manifest
@@ -203,6 +241,11 @@ Policy Name: {policy_name}
 Policy Description: {policy_desc}
 Test Type: {test_type}
 
+Policy Constraint (do not change its intent):
+```yaml
+{constraint_yaml}
+```
+
 Manifest:
 ```yaml
 {manifest}
@@ -210,39 +253,166 @@ Manifest:
 
 Your Task:
 1. **PRIMARY GOAL**: {preserve_instr}
-2. **SECONDARY GOAL**: Fix "noise" to make it deployable on Kind:
-   - Replace obscure images (openpolicyagent/opa, foo, ubuntu) with nginx or busybox
-   - Ensure resources.requests <= resources.limits
-   - Remove invalid securityContext settings
-   - Fix any invalid fields
-   - IF the resource relies on another resource (e.g. HPA needs Deployment, Ingress needs Service), ensure that dependent resource is VALID or added.
-   - **CRITICAL**: PRESERVE ALL LABELS AND SELECTORS. Do not remove any labels even if they seem useless (e.g. foo: bar).
-   - If adding a PodDisruptionBudget, prefer `maxUnavailable: 1` instead of `minAvailable` to avoid violations with single-replica deployments.
+2. **SECONDARY GOAL**: Fix "noise" to make it deployable on Kind.
+3. **DO NOT** change any field that could affect policy compliance or matching.
+   - Examples: `kind`, labels, selectors, namespace, image references (if policy is about images), ports/hosts if policy is about networking.
+4. Only adjust safe fields: image tags when not policy-related, resource limits/requests, invalid fields, or missing required structure.
+5. If you cannot safely fix the manifest, return it unchanged.
+6. Return ONLY the cleaned, valid YAML block. No explanations."""
 
-3. Return ONLY the cleaned, valid YAML block. No explanations."""
+    time.sleep(1)
+    content = generate_with_gemini(prompt)
+    if not content:
+        return None
 
+    if content.startswith("```yaml"):
+        content = content[7:]
+    elif content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+
+    return content.strip() if content else None
+
+
+# === Gator Verification ===
+
+
+def patch_constraint_yaml(constraint_yaml: str) -> str:
+    """Remove namespace restrictions to align with task namespaces."""
+    constraint = yaml.safe_load(constraint_yaml)
+    if not isinstance(constraint, dict):
+        raise ValueError("constraint YAML is not a mapping")
+
+    spec = constraint.get("spec")
+    if isinstance(spec, dict):
+        match = spec.get("match")
+        if isinstance(match, dict):
+            match.pop("namespaces", None)
+            match.pop("excludedNamespaces", None)
+
+    return yaml.safe_dump(constraint, default_flow_style=False, sort_keys=False)
+
+
+def is_cluster_scoped_kind(kind: str | None) -> bool:
+    return bool(kind) and kind in CLUSTER_SCOPED_KINDS
+
+
+def add_namespace_to_resources(manifest: str, namespace: str) -> str:
+    docs = list(yaml.safe_load_all(manifest))
+    if not any(doc for doc in docs):
+        raise ValueError("manifest contains no valid documents")
+
+    new_docs = []
+    for doc in docs:
+        if not doc:
+            continue
+        kind = doc.get("kind")
+        if is_cluster_scoped_kind(kind):
+            new_docs.append(doc)
+            continue
+        metadata = doc.setdefault("metadata", {})
+        metadata.setdefault("namespace", namespace)
+        new_docs.append(doc)
+
+    return yaml.safe_dump_all(new_docs, default_flow_style=False, sort_keys=False)
+
+
+def parse_gator_output(output: str) -> tuple[list[str], bool]:
+    violations = []
+    has_error = False
+    for line in output.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if "WARNING" in line:
+            continue
+        lower = line.lower()
+        if "error" in lower or "fatal" in lower:
+            has_error = True
+            continue
+        violations.append(line)
+
+    return violations, has_error
+
+
+def run_gator_test(
+    template_path: Path,
+    constraint_yaml: str,
+    resource_yaml: str,
+) -> list[str]:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        constraint_path = tmp_path / "constraint.yaml"
+        resource_path = tmp_path / "resources.yaml"
+        constraint_path.write_text(constraint_yaml)
+        resource_path.write_text(resource_yaml)
+
+        try:
+            result = subprocess.run(
+                [
+                    "gator",
+                    "test",
+                    "-f",
+                    str(template_path),
+                    "-f",
+                    str(constraint_path),
+                    "-f",
+                    str(resource_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=GATOR_TIMEOUT_SECONDS,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                "gator CLI not found. Install it from: "
+                "https://open-policy-agent.github.io/gatekeeper/website/docs/gator/"
+            ) from exc
+
+    output = (result.stdout or "") + (result.stderr or "")
+    violations, has_error = parse_gator_output(output)
+
+    if result.returncode != 0 and (has_error or not violations):
+        raise RuntimeError(output.strip() or "gator test failed")
+
+    return violations
+
+
+def verify_sample_with_gator(
+    template_path: Path,
+    constraint_yaml: str,
+    namespace: str,
+    alpha_manifest: str,
+    beta_manifest: str,
+) -> tuple[bool, str | None]:
+    patched_constraint = patch_constraint_yaml(constraint_yaml)
+
+    alpha_resources = add_namespace_to_resources(alpha_manifest, namespace)
     try:
-        time.sleep(1)  # Rate limit
-        resp = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}",
-            json={"contents": [{"parts": [{"text": prompt}]}]},
-            timeout=60,
+        alpha_violations = run_gator_test(
+            template_path,
+            patched_constraint,
+            alpha_resources,
         )
-        if resp.ok:
-            content = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            # Strip markdown code blocks
-            if content.startswith("```yaml"):
-                content = content[7:]
-            elif content.startswith("```"):
-                content = content[3:]
-            if content.endswith("```"):
-                content = content[:-3]
-            return content.strip()
-        log.warning(f"Gemini API error: {resp.status_code}")
-    except Exception as e:
-        log.warning(f"Gemini API exception: {e}")
+    except Exception as exc:
+        return False, f"alpha failed: {exc}"
+    if alpha_violations:
+        return False, f"alpha failed: unexpected violations: {len(alpha_violations)}"
 
-    return None
+    beta_resources = add_namespace_to_resources(beta_manifest, namespace)
+    try:
+        beta_violations = run_gator_test(
+            template_path,
+            patched_constraint,
+            beta_resources,
+        )
+    except Exception as exc:
+        return False, f"beta failed: {exc}"
+    if not beta_violations:
+        return False, "beta failed: expected violations but gator reported none"
+
+    return True, None
 
 
 # === Task Creation ===
@@ -416,6 +586,55 @@ def handle_uniqueness_checks(manifest_str: str, policy_name: str, is_beta: bool)
     return yaml.dump_all(docs, default_flow_style=False)
 
 
+def build_manifests_for_sample(
+    sample: Sample,
+    template_name: str,
+    description: str,
+    use_llm: bool,
+) -> tuple[str, str]:
+    allowed_parts = []
+    for i, manifest in enumerate(sample.allowed_manifests):
+        neutralized = neutralize_manifest(manifest, "alpha", i, template_name)
+        candidate = neutralized
+        if use_llm:
+            fixed = fix_manifest_for_kind(
+                neutralized,
+                description,
+                template_name,
+                sample.constraint_yaml,
+                is_allowed=True,
+            )
+            if fixed:
+                candidate = fixed
+        processed = inject_dependencies(candidate, template_name, is_allowed=True)
+        processed = apply_image_fixes(processed, template_name, is_allowed=True)
+        allowed_parts.append(processed)
+
+    disallowed_parts = []
+    for i, manifest in enumerate(sample.disallowed_manifests):
+        neutralized = neutralize_manifest(manifest, "beta", i, template_name)
+        candidate = neutralized
+        if use_llm:
+            fixed = fix_manifest_for_kind(
+                neutralized,
+                description,
+                template_name,
+                sample.constraint_yaml,
+                is_allowed=False,
+            )
+            if fixed:
+                candidate = fixed
+        processed = inject_dependencies(candidate, template_name, is_allowed=False)
+        processed = apply_image_fixes(processed, template_name, is_allowed=False)
+        processed = handle_uniqueness_checks(processed, template_name, is_beta=True)
+        disallowed_parts.append(processed)
+
+    alpha_manifest = "\n---\n".join(allowed_parts)
+    beta_manifest = "\n---\n".join(disallowed_parts)
+
+    return alpha_manifest, beta_manifest
+
+
 def create_task_directory(
     output_dir: Path,
     task_name: str,
@@ -511,28 +730,46 @@ def process_template(
         if not description:
             description = "A compliance policy is in effect for this cluster."
 
-        # Neutralize and fix manifests
-        allowed_parts = []
-        for i, manifest in enumerate(sample.allowed_manifests):
-            neutralized = neutralize_manifest(manifest, "alpha", i, template.name)
-            fixed = fix_manifest_for_kind(neutralized, description, template.name, is_allowed=True)
-            # Apply our python-based fixes
-            processed = inject_dependencies(fixed if fixed else neutralized, template.name, is_allowed=True)
-            processed = apply_image_fixes(processed, template.name, is_allowed=True)
-            allowed_parts.append(processed)
+        use_llm = bool(GEMINI_API_KEY)
+        alpha_manifest, beta_manifest = build_manifests_for_sample(
+            sample,
+            template.name,
+            description,
+            use_llm=use_llm,
+        )
 
-        disallowed_parts = []
-        for i, manifest in enumerate(sample.disallowed_manifests):
-            neutralized = neutralize_manifest(manifest, "beta", i, template.name)
-            fixed = fix_manifest_for_kind(neutralized, description, template.name, is_allowed=False)
-            # Apply our python-based fixes
-            processed = inject_dependencies(fixed if fixed else neutralized, template.name, is_allowed=False)
-            processed = apply_image_fixes(processed, template.name, is_allowed=False)
-            processed = handle_uniqueness_checks(processed, template.name, is_beta=True)
-            disallowed_parts.append(processed)
-
-        alpha_manifest = "\n---\n".join(allowed_parts)
-        beta_manifest = "\n---\n".join(disallowed_parts)
+        if VERIFY_GATOR:
+            template_path = template.path / "template.yaml"
+            ok, reason = verify_sample_with_gator(
+                template_path,
+                sample.constraint_yaml,
+                namespace,
+                alpha_manifest,
+                beta_manifest,
+            )
+            if not ok and use_llm:
+                log.info(f"Retrying without LLM fixes for {task_name}")
+                alpha_manifest, beta_manifest = build_manifests_for_sample(
+                    sample,
+                    template.name,
+                    description,
+                    use_llm=False,
+                )
+                ok, reason = verify_sample_with_gator(
+                    template_path,
+                    sample.constraint_yaml,
+                    namespace,
+                    alpha_manifest,
+                    beta_manifest,
+                )
+            if not ok:
+                results.append(GenerationResult(
+                    task_name=task_name,
+                    success=False,
+                    skip_reason=reason,
+                ))
+                log.error(f"Skipping {task_name}: {reason}")
+                continue
 
         try:
             task_dir = create_task_directory(
