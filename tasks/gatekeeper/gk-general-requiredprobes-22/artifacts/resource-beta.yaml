@@ -4,16 +4,21 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest
-    livenessProbe: null
-    name: container-beta-0
+  - image: nginx:1.7.9
+    livenessProbe:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      tcpSocket:
+        port: 80
+    name: nginx-1
     ports:
     - containerPort: 80
+    readinessProbe: null
     volumeMounts:
     - mountPath: /tmp/cache
       name: cache-volume
-  - image: nginx:latest
-    name: container-beta-0-1
+  - image: tomcat
+    name: tomcat
     ports:
     - containerPort: 8080
     readinessProbe:
@@ -32,21 +37,16 @@ metadata:
   name: resource-beta-1
 spec:
   containers:
-  - image: nginx:latest
-    livenessProbe:
-      initialDelaySeconds: 5
-      periodSeconds: 10
-      tcpSocket:
-        port: 80
-    name: container-beta-1
+  - image: nginx:1.7.9
+    livenessProbe: null
+    name: nginx-1
     ports:
     - containerPort: 80
-    readinessProbe: null
     volumeMounts:
     - mountPath: /tmp/cache
       name: cache-volume
-  - image: nginx:latest
-    name: container-beta-1-1
+  - image: tomcat
+    name: tomcat
     ports:
     - containerPort: 8080
     readinessProbe:

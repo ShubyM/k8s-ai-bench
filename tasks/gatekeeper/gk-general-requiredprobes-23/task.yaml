@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Could you check the gk-test-023 namespace for any pods where a container
+    is missing either a readiness or a liveness probe, or if a probe is defined, it
+    isn''t configured using a TCP socket, HTTP GET, or an exec command?
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

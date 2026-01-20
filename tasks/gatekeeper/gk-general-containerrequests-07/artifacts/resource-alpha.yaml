@@ -6,9 +6,13 @@ metadata:
   name: resource-alpha-0
 spec:
   containers:
-  - image: nginx:1.25 # Compliant tag
-    name: container-alpha-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx:1.14.2:0.9.2
+    name: opa
     resources:
       requests:
-        cpu: 200m
+        cpu: 100m
         memory: 1Gi

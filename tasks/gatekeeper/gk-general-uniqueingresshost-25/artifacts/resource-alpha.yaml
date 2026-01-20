@@ -3,6 +3,7 @@ kind: Ingress
 metadata:
   name: resource-alpha-0
 spec:
+  ingressClassName: nginx
   rules:
   - host: example-allowed-host.example.com
     http:

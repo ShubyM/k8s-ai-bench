@@ -48,7 +48,7 @@ spec:
   - resource:
       name: cpu
       target:
-        averageUtilization: 900
+        averageUtilization: 90
         type: Utilization
     type: Resource
   minReplicas: 3

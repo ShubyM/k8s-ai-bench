@@ -6,12 +6,13 @@ metadata:
   name: resource-alpha-0
 spec:
   containers:
-  - image: nginx:1.25 # Choose a tag that allows the pod, if the policy checks the image
-    name: container-alpha-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: nginx:1.14.2:0.9.2
+    name: opa
     resources:
       limits:
-        cpu: 200m # Modified to comply with the policy
-        memory: 1Gi
-      requests:
         cpu: 100m
-        memory: 512Mi # Added requests section and ensuring it is not greater than limits
+        memory: 1Gi

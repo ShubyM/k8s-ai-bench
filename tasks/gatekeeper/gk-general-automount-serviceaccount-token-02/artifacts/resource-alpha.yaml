@@ -7,5 +7,5 @@ metadata:
 spec:
   automountServiceAccountToken: false
   containers:
-  - image: nginx
-    name: container-alpha-0
+  - image: nginx:1.14.2
+    name: nginx

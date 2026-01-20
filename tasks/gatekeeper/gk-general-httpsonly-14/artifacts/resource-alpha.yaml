@@ -17,6 +17,4 @@ spec:
         path: /
         pathType: Prefix
   tls:
-  - hosts:
-    - example-host.example.com
-    secretName: example-host-tls
+  - {}

@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Could you please check the gk-test-009 namespace for any role or cluster
+    role bindings that grant system:anonymous or system:unauthenticated access, unless
+    the bound role is ''cluster-role-1''?
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

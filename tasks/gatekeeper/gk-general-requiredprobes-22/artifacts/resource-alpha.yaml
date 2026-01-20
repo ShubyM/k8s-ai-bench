@@ -4,13 +4,13 @@ metadata:
   name: resource-alpha-0
 spec:
   containers:
-  - image: nginx:latest
+  - image: tomcat:latest
     livenessProbe:
       initialDelaySeconds: 5
       periodSeconds: 10
       tcpSocket:
-        port: 80
-    name: container-alpha-0
+        port: 8080
+    name: tomcat
     ports:
     - containerPort: 8080
     readinessProbe:

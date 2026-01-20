@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Please check if the ''system:aggregate-to-edit'' role is configured to
+    allow creating, patching, or updating endpoints, which could affect resources
+    within the gk-test-001 namespace.
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

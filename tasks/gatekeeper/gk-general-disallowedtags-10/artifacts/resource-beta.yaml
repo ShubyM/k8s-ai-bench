@@ -4,5 +4,9 @@ metadata:
   name: resource-beta-0
 spec:
   containers:
-  - image: nginx:latest
-    name: container-beta-0
+  - args:
+    - run
+    - --server
+    - --addr=localhost:8080
+    image: openpolicyagent/opa:latest
+    name: opa

@@ -1,0 +1,20 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Could you please check the gk-test-020 namespace for any Services that
+    don''t have both an `a8r.io/owner` annotation (formatted as an email or GitHub
+    username) and an `a8r.io/runbook` annotation (formatted as a URL)?
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

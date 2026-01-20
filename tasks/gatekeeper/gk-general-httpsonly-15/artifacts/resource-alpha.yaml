@@ -16,3 +16,7 @@ spec:
               number: 80
         path: /
         pathType: Prefix
+  tls:
+  - hosts:
+    - example.com
+    secretName: example-tls

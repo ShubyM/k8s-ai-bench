@@ -1,0 +1,21 @@
+setup: setup.sh
+cleanup: cleanup.sh
+difficulty: medium
+expect:
+- contains: VIOLATING:.*resource-beta.*
+  notContains: resource-alpha
+script:
+- prompt: 'Could you review the gk-test-018 namespace and flag any Pod Disruption
+    Budgets that are configured to never allow any pods to be voluntarily disrupted,
+    either directly or by demanding that all selected application replicas must always
+    remain available, including instances with only one replica?
+
+
+    If you find any, list them in this format:
+
+    VIOLATING: resource_name, resource_name
+
+
+    Otherwise, just output:
+
+    VIOLATING: none'

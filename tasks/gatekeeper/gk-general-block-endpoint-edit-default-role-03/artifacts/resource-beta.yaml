@@ -3,11 +3,10 @@ kind: ClusterRole
 metadata:
   annotations:
     rbac.authorization.kubernetes.io/autoupdate: 'true'
-  creationTimestamp: null
   labels:
     kubernetes.io/bootstrapping: rbac-defaults
-    rbac.authorization.k8s.io/aggregate-to-edit: 'true'
-  name: system:endpoint-controller
+    rbac.authorization.kubernetes.io/aggregate-to-edit: 'true'
+  name: system:aggregate-to-edit
 rules:
 - apiGroups:
   - ''
