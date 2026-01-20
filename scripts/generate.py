@@ -7,11 +7,12 @@ import shutil
 import subprocess
 import tempfile
 import time
-import copy
 from dataclasses import dataclass
 from pathlib import Path
+
 import google.genai as genai  # type: ignore
 import yaml
+
 
 # === Constants ===
 
@@ -32,11 +33,6 @@ EXCLUDED_POLICIES = [
 # Resources that should NOT be renamed by neutralize_manifest
 PRESERVED_NAMES = {
     "system:aggregate-to-edit",
-}
-
-IMAGE_FIXES = {
-    "openpolicyagent/opa": "nginx:latest",
-    "nginx:latest": "nginx:1.14.2",
 }
 
 CLUSTER_SCOPED_KINDS = {
@@ -67,11 +63,16 @@ class ConstraintTemplate:
     path: Path
 
 @dataclass
+class SampleFile:
+    name: str
+    content: str
+
+
+@dataclass
 class Sample:
     name: str
     constraint_yaml: str
-    allowed_manifests: list[str]
-    disallowed_manifests: list[str]
+    files: list[SampleFile]
 
 @dataclass
 class GenerationResult:
@@ -147,26 +148,20 @@ def load_samples(template: ConstraintTemplate) -> list[Sample]:
         if not constraint_file.exists():
             continue
 
-        # Find allowed and disallowed examples
-        allowed = []
-        disallowed = []
-        for f in sample_dir.iterdir():
-            if not f.is_file():
+        files = []
+        for f in sorted(sample_dir.iterdir()):
+            if not f.is_file() or f.name.startswith("."):
                 continue
-            if f.name.startswith("example_allowed"):
-                allowed.append(f.read_text())
-            elif f.name.startswith("example_disallowed") and "both" not in f.name:
-                disallowed.append(f.read_text())
+            files.append(SampleFile(name=f.name, content=f.read_text()))
 
-        if not allowed or not disallowed:
-            log.debug(f"Sample {sample_dir.name} missing allowed/disallowed examples")
+        if not files:
+            log.debug(f"Sample {sample_dir.name} has no files")
             continue
 
         samples.append(Sample(
             name=sample_dir.name,
             constraint_yaml=constraint_file.read_text(),
-            allowed_manifests=allowed,
-            disallowed_manifests=disallowed,
+            files=files,
         ))
 
     return samples
@@ -174,19 +169,8 @@ def load_samples(template: ConstraintTemplate) -> list[Sample]:
 
 # === AI Generation ===
 
-_GENAI_CLIENT = None
 
-
-def get_genai_client():
-    global _GENAI_CLIENT
-    if _GENAI_CLIENT is None:
-        _GENAI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
-    return _GENAI_CLIENT
-
-
-def generate_with_gemini(prompt: str) -> str | None:
-    client = get_genai_client()
-
+def generate_with_gemini(client: genai.Client, prompt: str) -> str | None:
     try:
         response = client.models.generate_content(
             model=GEMINI_MODEL,
@@ -202,66 +186,54 @@ def generate_with_gemini(prompt: str) -> str | None:
     return text.strip()
 
 
-def generate_policy_description(constraint_yaml: str) -> str | None:
+def generate_policy_description(client: genai.Client, constraint_yaml: str) -> str | None:
     """Use Gemini to generate a natural language description of the constraint."""
-    if not GEMINI_API_KEY:
-        return None
-
     prompt = f"""Explain what this policy is checking for in a simple, natural phrase.
 Example: "don't have an owner label" or "use a disallowed image registry" or "have too many replicas".
 Do not use technical jargon or start with "This policy...". Just the phrase.
 
 {constraint_yaml}"""
 
-    return generate_with_gemini(prompt)
+    return generate_with_gemini(client, prompt)
 
 
-def fix_manifest_for_kind(
-    manifest: str,
+def refine_manifests_with_llm(
+    client: genai.Client,
+    sample: Sample,
     policy_desc: str,
     policy_name: str,
-    constraint_yaml: str,
-    is_allowed: bool,
-) -> str | None:
-    """Use Gemini to fix manifest to be deployable on Kind while preserving test logic."""
-    if not GEMINI_API_KEY:
-        return manifest
-
-    test_type = "ALLOWED (should pass)" if is_allowed else "DISALLOWED (should violate)"
-    preserve_instr = (
-        "Ensure the resource remains COMPLIANT with the policy."
-        if is_allowed else
-        "Ensure the resource remains NON-COMPLIANT (violating) the policy."
+) -> tuple[str, str] | None:
+    """Use Gemini to produce alpha/beta manifests from sample files."""
+    files_blob = "\n\n".join(
+        f"### {file.name}\n```yaml\n{file.content}\n```" for file in sample.files
     )
 
     prompt = f"""You are an expert Kubernetes engineer.
-I have a Kubernetes manifest that is used as a test case for a Gatekeeper policy.
+I have a Gatekeeper policy and a folder of sample manifests.
+Your task is to output TWO YAML documents:
+- alpha.yaml: should PASS the constraint
+- beta.yaml: should VIOLATE the constraint
 
 Policy Name: {policy_name}
 Policy Description: {policy_desc}
-Test Type: {test_type}
 
-Policy Constraint (do not change its intent):
+Constraint:
 ```yaml
-{constraint_yaml}
+{sample.constraint_yaml}
 ```
 
-Manifest:
-```yaml
-{manifest}
-```
+Sample Files (use these as the starting point; mutate them if needed):
+{files_blob}
 
-Your Task:
-1. **PRIMARY GOAL**: {preserve_instr}
-2. **SECONDARY GOAL**: Fix "noise" to make it deployable on Kind.
-3. **DO NOT** change any field that could affect policy compliance or matching.
-   - Examples: `kind`, labels, selectors, namespace, image references (if policy is about images), ports/hosts if policy is about networking.
-4. Only adjust safe fields: image tags when not policy-related, resource limits/requests, invalid fields, or missing required structure.
-5. If you cannot safely fix the manifest, return it unchanged.
-6. Return ONLY the cleaned, valid YAML block. No explanations."""
+Rules:
+- Keep changes minimal and based on the samples.
+- Preserve any required supporting objects (inventory fixtures) if policy needs them.
+- Ensure beta violates the constraint and alpha does not.
+- Output ONLY two YAML documents separated by "---".
+"""
 
     time.sleep(1)
-    content = generate_with_gemini(prompt)
+    content = generate_with_gemini(client, prompt)
     if not content:
         return None
 
@@ -272,7 +244,16 @@ Your Task:
     if content.endswith("```"):
         content = content[:-3]
 
-    return content.strip() if content else None
+    if not content:
+        return None
+
+    parts = [part.strip() for part in content.split("---") if part.strip()]
+    if len(parts) < 2:
+        return None
+
+    alpha_manifest = parts[0]
+    beta_manifest = "\n---\n".join(parts[1:])
+    return alpha_manifest, beta_manifest
 
 
 # === Gator Verification ===
@@ -424,215 +405,43 @@ def neutralize_manifest(manifest: str, suffix: str, index: int, policy_name: str
     for doc in docs:
         if not doc:
             continue
-        
+
         if "metadata" not in doc:
             new_docs.append(doc)
             continue
-        
+
         name = doc["metadata"].get("name", "")
         if name in PRESERVED_NAMES:
             new_docs.append(doc)
             continue
-            
+
         doc["metadata"]["name"] = f"resource-{suffix}-{index}"
         doc["metadata"].pop("namespace", None)
-
-        # Update app labels consistently
-        new_app_label = f"app-{suffix}"
-        if "labels" in doc.get("metadata", {}):
-            if "app" in doc["metadata"]["labels"]:
-                doc["metadata"]["labels"]["app"] = new_app_label
-
-        # Update selector labels in spec
-        spec = doc.get("spec", {})
-        if "selector" in spec and "matchLabels" in spec["selector"]:
-            if "app" in spec["selector"]["matchLabels"]:
-                spec["selector"]["matchLabels"]["app"] = new_app_label
-        if "template" in spec:
-            tmpl_meta = spec["template"].get("metadata", {})
-            if "labels" in tmpl_meta and "app" in tmpl_meta["labels"]:
-                tmpl_meta["labels"]["app"] = new_app_label
-        
         new_docs.append(doc)
 
     return yaml.dump_all(new_docs, default_flow_style=False)
 
-def apply_image_fixes(manifest_str: str, policy_name: str, is_allowed: bool) -> str:
-    """Replace problematic images with standard ones."""
-    # Don't fix images for disallowedtags beta resources as they rely on bad tags
-    if "disallowedtags" in policy_name and not is_allowed:
-        return manifest_str
-        
-    for bad, good in IMAGE_FIXES.items():
-        manifest_str = manifest_str.replace(bad, good)
-    return manifest_str
-
-def inject_dependencies(manifest_str: str, policy_name: str, is_allowed: bool) -> str:
-    """Inject required dependencies or fix fields based on policy knowledge."""
-    docs = list(yaml.safe_load_all(manifest_str))
-    new_docs = []
-    
-    # Track existing kinds to avoid duplicates if possible
-    existing_kinds = {doc.get("kind") for doc in docs if doc}
-    
-    for doc in docs:
-        if not doc:
-            continue
-        
-        kind = doc.get("kind", "")
-        spec = doc.get("spec", {})
-        
-        # 1. HPA -> Deployment
-        if kind == "HorizontalPodAutoscaler":
-            scale_target = spec.get("scaleTargetRef", {})
-            target_kind = scale_target.get("kind", "Deployment")
-            target_name = scale_target.get("name", "nginx-deployment")
-            
-            # Ensure target name is set if missing
-            if "name" not in scale_target:
-                scale_target["name"] = target_name
-                doc["spec"]["scaleTargetRef"] = scale_target
-            
-            if target_kind == "Deployment":
-                dep_yaml = f"""
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{target_name}}
-spec:
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx:1.14.2
-""".format(target_name=target_name)
-                new_docs.append(yaml.safe_load(dep_yaml))
-
-        # 2. Ingress HTTPS -> TLS
-        if "httpsonly" in policy_name and kind == "Ingress":
-            if "tls" not in spec:
-                spec["tls"] = [{
-                    "hosts": ["example.com"],
-                    "secretName": "example-tls"
-                }]
-                doc["spec"] = spec
-        
-        # 3. StorageClass Inventory Mocking
-        if "storageclass" in policy_name:
-            sc_name = ""
-            if kind == "PersistentVolumeClaim":
-                sc_name = spec.get("storageClassName", "somestorageclass")
-            elif kind == "StatefulSet":
-                vcts = spec.get("volumeClaimTemplates", [])
-                if vcts:
-                    sc_name = vcts[0].get("spec", {}).get("storageClassName", "somestorageclass")
-            
-            if sc_name and sc_name != "manual": # manual usually means no class
-                sc_yaml = f"""
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: {{sc_name}}
-  namespace: ""
-provisioner: kubernetes.io/no-provisioner
-""".format(sc_name=sc_name)
-                new_docs.append(yaml.safe_load(sc_yaml))
-
-        # 5. Force name for block-endpoint-edit-default-role
-        if "block-endpoint-edit-default-role" in policy_name and kind == "ClusterRole":
-             doc["metadata"]["name"] = "system:aggregate-to-edit"
-
-    # Add original docs
-    new_docs.extend(docs)
-    return yaml.dump_all(new_docs, default_flow_style=False)
-
-def handle_uniqueness_checks(manifest_str: str, policy_name: str, is_beta: bool) -> str:
-    """Duplicate resources to create conflicts for uniqueness policies."""
-    if not is_beta:
-        return manifest_str
-    
-    if "unique" not in policy_name:
-        return manifest_str
-
-    docs = list(yaml.safe_load_all(manifest_str))
-    
-    # Check if we need duplication (if checking uniqueness of ingress or service)
-    # Even if multiple docs exist, they might not conflict. So we duplicate relevant ones.
-    
-    docs_to_add = []
-    for doc in docs:
-        if not doc:
-            continue
-        kind = doc.get("kind")
-        should_duplicate = False
-        
-        if "ingress" in policy_name and kind == "Ingress":
-            should_duplicate = True
-        elif "service" in policy_name and kind == "Service":
-            should_duplicate = True
-            
-        if should_duplicate:
-            doc2 = copy.deepcopy(doc)
-            doc2["metadata"]["name"] = doc["metadata"]["name"] + "-conflict"
-            docs_to_add.append(doc2)
-    
-    docs.extend(docs_to_add)
-    return yaml.dump_all(docs, default_flow_style=False)
-
-
 def build_manifests_for_sample(
+    client: genai.Client,
     sample: Sample,
     template_name: str,
     description: str,
-    use_llm: bool,
 ) -> tuple[str, str]:
-    allowed_parts = []
-    for i, manifest in enumerate(sample.allowed_manifests):
-        neutralized = neutralize_manifest(manifest, "alpha", i, template_name)
-        candidate = neutralized
-        if use_llm:
-            fixed = fix_manifest_for_kind(
-                neutralized,
-                description,
-                template_name,
-                sample.constraint_yaml,
-                is_allowed=True,
-            )
-            if fixed:
-                candidate = fixed
-        processed = inject_dependencies(candidate, template_name, is_allowed=True)
-        processed = apply_image_fixes(processed, template_name, is_allowed=True)
-        allowed_parts.append(processed)
+    refined = refine_manifests_with_llm(client, sample, description, template_name)
+    if refined:
+        return refined
 
-    disallowed_parts = []
-    for i, manifest in enumerate(sample.disallowed_manifests):
-        neutralized = neutralize_manifest(manifest, "beta", i, template_name)
-        candidate = neutralized
-        if use_llm:
-            fixed = fix_manifest_for_kind(
-                neutralized,
-                description,
-                template_name,
-                sample.constraint_yaml,
-                is_allowed=False,
-            )
-            if fixed:
-                candidate = fixed
-        processed = inject_dependencies(candidate, template_name, is_allowed=False)
-        processed = apply_image_fixes(processed, template_name, is_allowed=False)
-        processed = handle_uniqueness_checks(processed, template_name, is_beta=True)
-        disallowed_parts.append(processed)
+    alpha = next((file.content for file in sample.files if "allowed" in file.name), "")
+    beta = next((file.content for file in sample.files if "disallowed" in file.name), "")
 
-    alpha_manifest = "\n---\n".join(allowed_parts)
-    beta_manifest = "\n---\n".join(disallowed_parts)
+    if not alpha or not beta:
+        return "", ""
 
-    return alpha_manifest, beta_manifest
+    alpha = neutralize_manifest(alpha, "alpha", 0, template_name)
+    beta = neutralize_manifest(beta, "beta", 0, template_name)
+
+    return alpha, beta
+
 
 
 def create_task_directory(
@@ -705,6 +514,7 @@ VIOLATING: none"""
 # === Main Orchestration ===
 
 def process_template(
+    client: genai.Client,
     template: ConstraintTemplate,
     output_dir: Path,
     task_index: int,
@@ -726,16 +536,15 @@ def process_template(
         namespace = f"gk-test-{task_index + sample_idx:03d}"
 
         # Generate description
-        description = generate_policy_description(sample.constraint_yaml)
+        description = generate_policy_description(client, sample.constraint_yaml)
         if not description:
             description = "A compliance policy is in effect for this cluster."
 
-        use_llm = bool(GEMINI_API_KEY)
         alpha_manifest, beta_manifest = build_manifests_for_sample(
+            client,
             sample,
             template.name,
             description,
-            use_llm=use_llm,
         )
 
         if VERIFY_GATOR:
@@ -747,21 +556,6 @@ def process_template(
                 alpha_manifest,
                 beta_manifest,
             )
-            if not ok and use_llm:
-                log.info(f"Retrying without LLM fixes for {task_name}")
-                alpha_manifest, beta_manifest = build_manifests_for_sample(
-                    sample,
-                    template.name,
-                    description,
-                    use_llm=False,
-                )
-                ok, reason = verify_sample_with_gator(
-                    template_path,
-                    sample.constraint_yaml,
-                    namespace,
-                    alpha_manifest,
-                    beta_manifest,
-                )
             if not ok:
                 results.append(GenerationResult(
                     task_name=task_name,
@@ -803,6 +597,8 @@ def main():
     library_dir = repo_dir / ".gatekeeper-library"
     output_dir = repo_dir / "tasks" / "gatekeeper"
 
+    client = genai.Client(api_key=GEMINI_API_KEY)
+
     # Clean output directory
     if output_dir.exists():
         log.info(f"Cleaning existing output directory: {output_dir}")
@@ -819,7 +615,7 @@ def main():
     task_index = 0
 
     for template in templates:
-        results = process_template(template, output_dir, task_index)
+        results = process_template(client, template, output_dir, task_index)
         all_results.extend(results)
         task_index += len(results)
 
