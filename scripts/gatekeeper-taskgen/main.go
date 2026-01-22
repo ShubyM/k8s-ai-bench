@@ -13,7 +13,33 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-var defaultSkipList = []string{"block-endpoint-default-role", "noupdateserviceaccount", "verifydeprecatedapi"}
+var defaultSkipList = []string{
+	// Name-sensitive or deprecated policies
+	"block-endpoint-default-role",
+	"noupdateserviceaccount",
+	"verifydeprecatedapi",
+	// Tasks with non-deployable resources (fake images, deprecated registries)
+	// These can't be fixed without breaking alpha/beta distinction
+	"allowed-reposv2",
+	"disallowed-tags",
+	"repo-must-not-be-k8s-gcr-io",
+	// Tasks with high resource requests that won't schedule on small clusters
+	// Capping resources would make both alpha and beta pass
+	"container-cpu-requests-memory-limits-and-requests",
+	"container-limits",
+	"container-limits-and-requests",
+	"container-limits-ignore-cpu",
+	"container-requests",
+	"ephemeral-storage-limit",
+	"memory-and-cpu-ratios",
+	"memory-ratio-only",
+	// Tasks with PVC issues
+	"storageclass",
+	"storageclass-allowlist",
+	// Tasks with complex runtime issues that need manual fixes
+	"container-image-must-have-digest", // OPA init container
+	"required-probes",                  // readiness probe port mismatches
+}
 
 func main() {
 	cfg := Config{}

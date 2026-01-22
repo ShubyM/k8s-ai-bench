@@ -195,11 +195,16 @@ func rewriteManifest(doc map[string]interface{}, name, ns string, nameMap map[st
 		updatePodTemplate(spec, nameMap)
 	case "Deployment", "ReplicaSet", "DaemonSet":
 		updatePodTemplate(spec, nameMap)
+		fixReplicaCount(spec, expected)
 	case "Pod":
 		updatePodSpec(spec, nameMap)
 	case "RoleBinding", "ClusterRoleBinding":
 		updateRoleBinding(doc, nameMap, ns)
 	}
+
+	// Apply deployment fixes
+	fixInitContainers(doc)
+	fixBadImages(doc)
 }
 
 func updateVCT(spec map[string]interface{}, nameMap map[string]string) {
@@ -258,6 +263,117 @@ func updateRoleBinding(doc map[string]interface{}, nameMap map[string]string, ns
 	if ref, ok := doc["roleRef"].(map[string]interface{}); ok {
 		if n, ok := ref["name"].(string); ok {
 			ref["name"] = mapName(n, nameMap)
+		}
+	}
+}
+
+// Deployment fixes - make manifests deployable without breaking test semantics
+
+// fixReplicaCount caps excessive replica counts while preserving alpha/beta distinction
+// Alpha stays at original (e.g., 3), Beta gets capped to 5 (still > limit, so still fails)
+func fixReplicaCount(spec map[string]interface{}, expected string) {
+	if expected != "beta" {
+		return
+	}
+	const maxBetaReplicas = 5
+	if replicas, ok := spec["replicas"].(int); ok && replicas > maxBetaReplicas {
+		spec["replicas"] = maxBetaReplicas
+	}
+	if replicas, ok := spec["replicas"].(float64); ok && int(replicas) > maxBetaReplicas {
+		spec["replicas"] = maxBetaReplicas
+	}
+}
+
+// fixInitContainers adds exit command to init containers that would run forever
+func fixInitContainers(doc map[string]interface{}) {
+	kind := getStr(doc, "kind")
+	var podSpec map[string]interface{}
+
+	switch kind {
+	case "Pod":
+		podSpec, _ = doc["spec"].(map[string]interface{})
+	case "Deployment", "ReplicaSet", "DaemonSet", "StatefulSet":
+		if spec, ok := doc["spec"].(map[string]interface{}); ok {
+			if template, ok := spec["template"].(map[string]interface{}); ok {
+				podSpec, _ = template["spec"].(map[string]interface{})
+			}
+		}
+	}
+
+	if podSpec == nil {
+		return
+	}
+
+	initContainers, ok := podSpec["initContainers"].([]interface{})
+	if !ok {
+		return
+	}
+
+	for _, c := range initContainers {
+		container, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		// Init containers need to exit for the pod to start.
+		// Override command/args with a simple exit for images that run servers.
+		image, _ := container["image"].(string)
+		if strings.Contains(image, "nginx") {
+			container["command"] = []interface{}{"sh", "-c", "exit 0"}
+			delete(container, "args")
+		} else if strings.Contains(image, "opa") {
+			// OPA image doesn't have sh, use built-in eval that exits
+			container["command"] = []interface{}{"opa", "eval", "true"}
+			delete(container, "args")
+		}
+	}
+}
+
+// fixBadImages replaces images that fail to pull with working alternatives
+// Only for images where the replacement doesn't affect the policy test
+func fixBadImages(doc map[string]interface{}) {
+	kind := getStr(doc, "kind")
+	var podSpec map[string]interface{}
+
+	switch kind {
+	case "Pod":
+		podSpec, _ = doc["spec"].(map[string]interface{})
+	case "Deployment", "ReplicaSet", "DaemonSet", "StatefulSet":
+		if spec, ok := doc["spec"].(map[string]interface{}); ok {
+			if template, ok := spec["template"].(map[string]interface{}); ok {
+				podSpec, _ = template["spec"].(map[string]interface{})
+			}
+		}
+	}
+
+	if podSpec == nil {
+		return
+	}
+
+	// Only fix specific images where replacement doesn't break test semantics
+	replacements := map[string]string{
+		"tomcat":      "nginx",      // required-probes: policy checks probes, not image
+		"nginx:1.7.9": "nginx:1.25", // old nginx tag doesn't exist
+	}
+
+	for _, key := range []string{"containers", "initContainers"} {
+		containers, ok := podSpec[key].([]interface{})
+		if !ok {
+			continue
+		}
+		for _, c := range containers {
+			container, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			image, ok := container["image"].(string)
+			if !ok {
+				continue
+			}
+			for bad, good := range replacements {
+				if image == bad {
+					container["image"] = good
+				}
+			}
 		}
 	}
 }
