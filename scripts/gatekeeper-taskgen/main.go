@@ -143,26 +143,62 @@ func generateTask(cfg Config, task TaskMetadata) error {
 	taskYAML := fmt.Sprintf(`script:
 - prompt: |
 %s
-isolation: cluster
-difficulty: medium
-setup: setup.sh
-cleanup: cleanup.sh
 expect:
-- contains: "resource-beta-\\d+"
-- notContains: "resource-alpha-\\d+"
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m
 `, indent(prompt, "    "))
 	os.WriteFile(filepath.Join(outDir, "task.yaml"), []byte(taskYAML), 0644)
 
 	// Write suite.yaml
 	writeSuite(outDir, task, artifacts)
 
-	// Copy constraint
-	copyFile(task.ConstraintPath, filepath.Join(outDir, "constraint.yaml"))
+	// Rewrite constraint
+	rewriteConstraint(task.ConstraintPath, filepath.Join(outDir, "constraint.yaml"), "gk-"+task.TaskID)
+	copyFile(task.TemplatePath, filepath.Join(outDir, "template.yaml"))
 
 	// Write setup/cleanup scripts
 	writeScripts(outDir, task.TaskID, artifacts)
 
 	return nil
+}
+
+func rewriteConstraint(src, dst, ns string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+
+	// Update namespaces in match criteria
+	if spec, ok := doc["spec"].(map[string]interface{}); ok {
+		if match, ok := spec["match"].(map[string]interface{}); ok {
+			if namespaces, ok := match["namespaces"].([]interface{}); ok {
+				fmt.Printf("Rewriting constraint %s: namespaces %v -> %s\n", dst, namespaces, ns)
+				// if namespaces filter is present, replace it with our task namespace
+				// otherwise checking specific namespace is not required (cluster-wide)
+				if len(namespaces) > 0 {
+					match["namespaces"] = []string{ns}
+				}
+			} else {
+				fmt.Printf("Constraint %s match['namespaces'] not found or valid type\n", dst)
+			}
+		} else {
+			fmt.Printf("Constraint %s match not found\n", dst)
+		}
+	} else {
+		fmt.Printf("Constraint %s spec not found\n", dst)
+	}
+
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, out, 0644)
 }
 
 func writeSuite(outDir string, task TaskMetadata, artifacts TaskArtifacts) {
@@ -205,7 +241,7 @@ func writeScripts(outDir, taskID string, artifacts TaskArtifacts) {
 		}
 		fmt.Fprintf(&nsSetup, "kubectl delete namespace %q --ignore-not-found\n", n)
 		fmt.Fprintf(&nsSetup, "kubectl create namespace %q\n", n)
-		fmt.Fprintf(&nsSetup, "kubectl wait --for=condition=Active --timeout=120s namespace %q\n", n)
+		fmt.Fprintf(&nsSetup, "kubectl wait --for=jsonpath='{.status.phase}'=Active --timeout=120s namespace %q\n", n)
 		fmt.Fprintf(&nsCleanup, "kubectl delete namespace %q --ignore-not-found\n", n)
 	}
 
@@ -220,9 +256,9 @@ TASK_NAMESPACE=%q
 %s
 ARTIFACTS_DIR="$(dirname "$0")/artifacts"
 # Apply inventory first (dependencies), then alpha/beta resources
-kubectl apply -f "$ARTIFACTS_DIR"/inventory-*.yaml 2>/dev/null || true
-kubectl apply -f "$ARTIFACTS_DIR"/alpha-*.yaml 2>/dev/null || true
-kubectl apply -f "$ARTIFACTS_DIR"/beta-*.yaml 2>/dev/null || true
+kubectl apply -f "$ARTIFACTS_DIR"/inventory-*.yaml
+kubectl apply -f "$ARTIFACTS_DIR"/alpha-*.yaml
+kubectl apply -f "$ARTIFACTS_DIR"/beta-*.yaml
 `, ns, strings.TrimSpace(nsSetup.String()))
 
 	cleanup := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s%s", nsCleanup.String(), resCleanup.String())

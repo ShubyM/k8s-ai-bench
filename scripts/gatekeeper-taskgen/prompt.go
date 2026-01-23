@@ -31,9 +31,10 @@ func buildTemplatePrompt(ctx PromptContext) string {
 		fmt.Fprintf(&b, "Description: %s\n", ctx.Description)
 	}
 
-	b.WriteString("\nExamine the deployed resources and identify which ones violate this policy. ")
+	b.WriteString(fmt.Sprintf("\nExamine the deployed resources in the %q namespace and identify which ones violate this policy. ", ctx.Namespace))
 	b.WriteString("Use kubectl to inspect the cluster and find non-compliant resources.\n\n")
-	b.WriteString("Respond with the names of violating resources only, one per line.")
+	b.WriteString("Response with the following format for each violating resource:\n")
+	b.WriteString("VIOLATING: <resource name>\n")
 	return b.String()
 }
 
@@ -47,14 +48,21 @@ The benchmark tests whether an AI can identify policy-violating Kubernetes resou
 The AI being tested will use kubectl to examine deployed resources and determine which ones violate the policy.
 
 Generate a clear, concise task prompt that:
-1. Explains what policy is being enforced
-2. Describes what makes a resource compliant vs violating based on its configuration
-3. Instructs the AI to use kubectl to inspect the cluster
-4. Asks the AI to identify only the violating resource names
-5. Is 3-6 sentences maximum
+1. Explains what policy is being enforced in a natural langugage way, keep it concise
+2. Asks the AI to identify the violating resource names
 
 IMPORTANT: Do NOT mention resource naming conventions, alpha/beta patterns, or any hints about which resources are violating.
 The AI must determine violations by examining the actual resource configurations, not by name patterns.
+
+Required Output Format:
+For each violating resource, the AI must print exactly one line:
+VIOLATING: <resource name>
+
+The prompt MUST specify that the resources to be checked are in the provided Namespace.
+Do NOT use 'default' namespace unless the provided Namespace is 'default'.
+Replace 'default' in the description with the provided Namespace if necessary.
+
+
 
 Policy Information:
 `)
@@ -64,6 +72,9 @@ Policy Information:
 	}
 	if ctx.Description != "" {
 		fmt.Fprintf(&metaPrompt, "Description: %s\n", ctx.Description)
+	}
+	if ctx.Namespace != "" {
+		fmt.Fprintf(&metaPrompt, "Namespace: %s\n", ctx.Namespace)
 	}
 
 	if ctx.ConstraintYAML != "" {
@@ -92,7 +103,7 @@ Policy Information:
 	metaPrompt.WriteString(`
 Generate only the task prompt text, nothing else. Do not include markdown formatting.
 Do not mention anything about resource naming patterns or conventions.
-The prompt should end with: "Respond with the names of violating resources only, one per line."`)
+	The prompt should end with strict instructions to use the "VIOLATING: <resource name>" format for every violation found.`)
 
 	result, err := client.Models.GenerateContent(geminiCtx, "gemini-2.0-flash", genai.Text(metaPrompt.String()), nil)
 	if err != nil {

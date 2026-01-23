@@ -94,4 +94,5 @@ type PromptContext struct {
 	ConstraintYAML string
 	AlphaExamples  []string
 	BetaExamples   []string
+	Namespace      string
 }

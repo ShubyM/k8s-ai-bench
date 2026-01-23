@@ -45,6 +45,10 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 	// Read constraint
 	if data, err := os.ReadFile(task.ConstraintPath); err == nil {
 		constraintYAML = string(data)
+		// Patch constraint for prompt (simple string replace for now to avoid overhead)
+		// This ensures Gemini sees the isolated namespace
+		constraintYAML = strings.Replace(constraintYAML, "- \"default\"", fmt.Sprintf("- %q", defaultNS), 1)
+		constraintYAML = strings.Replace(constraintYAML, "- default", fmt.Sprintf("- %q", defaultNS), 1)
 	}
 
 	for _, c := range task.Cases {
@@ -53,14 +57,7 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			continue
 		}
 
-		// Store original YAML for Gemini
-		if origData, err := os.ReadFile(c.ObjectPath); err == nil {
-			if c.Expected == "alpha" && len(alphaExamples) < 2 {
-				alphaExamples = append(alphaExamples, string(origData))
-			} else if c.Expected == "beta" && len(betaExamples) < 2 {
-				betaExamples = append(betaExamples, string(origData))
-			}
-		}
+
 
 		// Load inventory docs
 		var invDocs []map[string]interface{}
@@ -124,6 +121,14 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			data, _ := yaml.Marshal(d.doc)
 			os.WriteFile(filepath.Join(outDir, relPath), data, 0644)
 
+			if !d.isInv {
+				if c.Expected == "alpha" && len(alphaExamples) < 2 {
+					alphaExamples = append(alphaExamples, string(data))
+				} else if c.Expected == "beta" && len(betaExamples) < 2 {
+					betaExamples = append(betaExamples, string(data))
+				}
+			}
+
 			artifacts.Manifests = append(artifacts.Manifests, TaskManifest{
 				Path:          filepath.Join(outDir, relPath),
 				RelPath:       relPath,
@@ -161,6 +166,7 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 		ConstraintYAML: constraintYAML,
 		AlphaExamples:  alphaExamples,
 		BetaExamples:   betaExamples,
+		Namespace:      defaultNS,
 	}
 
 	return artifacts, promptCtx, nil
@@ -169,7 +175,7 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 func rewriteManifest(doc map[string]interface{}, name, ns string, nameMap map[string]string, taskID, expected string, isInv bool) {
 	meta := ensureMap(doc, "metadata")
 	meta["name"] = name
-	if !isClusterScoped(getStr(doc, "kind")) && meta["namespace"] == nil {
+	if !isClusterScoped(getStr(doc, "kind")) {
 		meta["namespace"] = ns
 	}
 	labels := ensureMap(meta, "labels")

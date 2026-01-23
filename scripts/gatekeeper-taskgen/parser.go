@@ -11,7 +11,10 @@ import (
 // ParseSuites finds and parses all suite.yaml files under libraryRoot
 func ParseSuites(libraryRoot string) (map[string]TaskMetadata, error) {
 	var suitePaths []string
-	filepath.WalkDir(libraryRoot, func(path string, d fs.DirEntry, _ error) error {
+	filepath.WalkDir(libraryRoot, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
 		if !d.IsDir() && d.Name() == "suite.yaml" {
 			suitePaths = append(suitePaths, path)
 		}
