@@ -252,13 +252,37 @@ func writeScripts(outDir, taskID string, artifacts TaskArtifacts) {
 
 	setup := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
+shopt -s nullglob
 TASK_NAMESPACE=%q
 %s
 ARTIFACTS_DIR="$(dirname "$0")/artifacts"
 # Apply inventory first (dependencies), then alpha/beta resources
-kubectl apply -f "$ARTIFACTS_DIR"/inventory-*.yaml
-kubectl apply -f "$ARTIFACTS_DIR"/alpha-*.yaml
-kubectl apply -f "$ARTIFACTS_DIR"/beta-*.yaml
+for file in "$ARTIFACTS_DIR"/inventory-*.yaml; do
+  kubectl apply -f "$file"
+done
+for file in "$ARTIFACTS_DIR"/alpha-*.yaml; do
+  kubectl apply -f "$file"
+done
+for file in "$ARTIFACTS_DIR"/beta-*.yaml; do
+  kubectl apply -f "$file"
+done
+for file in "$ARTIFACTS_DIR"/inventory-*.yaml "$ARTIFACTS_DIR"/alpha-*.yaml "$ARTIFACTS_DIR"/beta-*.yaml; do
+  kind="$(kubectl get -f "$file" -o jsonpath='{.kind}')"
+  case "$kind" in
+    Deployment|StatefulSet|DaemonSet)
+      kubectl rollout status -f "$file" --timeout=120s
+      ;;
+    ReplicaSet)
+      kubectl wait --for=condition=Available --timeout=120s -f "$file"
+      ;;
+    Pod)
+      kubectl wait --for=condition=Ready --timeout=120s -f "$file"
+      ;;
+    Job)
+      kubectl wait --for=condition=Complete --timeout=120s -f "$file"
+      ;;
+  esac
+done
 `, ns, strings.TrimSpace(nsSetup.String()))
 
 	cleanup := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s%s", nsCleanup.String(), resCleanup.String())
