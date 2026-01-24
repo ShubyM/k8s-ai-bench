@@ -47,6 +47,7 @@ func main() {
 	flag.StringVar(&cfg.OutputDir, "output-dir", "tasks/gatekeeper", "Directory to write tasks")
 	flag.Var(&stringSliceFlag{&cfg.SkipList}, "skip", "Patterns to skip (can be repeated)")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Enable verbose logging")
+	flag.BoolVar(&cfg.Repair, "repair", false, "Repair beta manifests via Gemini after generation")
 	flag.Parse()
 
 	cfg.SkipList = append(cfg.SkipList, defaultSkipList...)
@@ -143,6 +144,8 @@ func generateTask(cfg Config, task TaskMetadata) error {
 	taskYAML := fmt.Sprintf(`script:
 - prompt: |
 %s
+setup: setup.sh
+cleanup: cleanup.sh
 expect:
 - contains: "VIOLATING: resource-beta-\\d+"
 - notContains: "VIOLATING: resource-alpha-\\d+"
@@ -160,6 +163,12 @@ timeout: 5m
 
 	// Write setup/cleanup scripts
 	writeScripts(outDir, task.TaskID, artifacts)
+
+	if cfg.Repair {
+		if err := repairTask(cfg, outDir, task.TaskID); err != nil {
+			return fmt.Errorf("repair %s: %w", task.TaskID, err)
+		}
+	}
 
 	return nil
 }
@@ -283,6 +292,12 @@ for file in "$ARTIFACTS_DIR"/inventory-*.yaml "$ARTIFACTS_DIR"/alpha-*.yaml "$AR
       ;;
   esac
 done
+# Show deployed resources for debugging
+kubectl get all -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get ingress -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get hpa -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get pdb -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get clusterrolebinding 2>/dev/null | head -n 20 || true
 `, ns, strings.TrimSpace(nsSetup.String()))
 
 	cleanup := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s%s", nsCleanup.String(), resCleanup.String())

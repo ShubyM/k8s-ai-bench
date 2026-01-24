@@ -46,6 +46,16 @@ func (p *Provider) Exists(name string) (bool, error) {
 }
 
 func (p *Provider) Create(name string) error {
+	exists, err := p.Exists(name)
+	if err != nil {
+		return err
+	}
+	if exists {
+		fmt.Printf("Cluster %q already exists, deleting\n", name)
+		if err := p.Delete(name); err != nil {
+			return fmt.Errorf("failed to delete existing cluster %q: %w", name, err)
+		}
+	}
 	var createErr error
 	for retry := range 3 {
 		if retry > 0 {

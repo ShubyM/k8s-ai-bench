@@ -57,8 +57,6 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			continue
 		}
 
-
-
 		// Load inventory docs
 		var invDocs []map[string]interface{}
 		for _, inv := range c.InventoryPaths {
@@ -158,15 +156,30 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 
 	artifacts.Namespaces = sortedKeys(nsSet)
 
+	namespacedKindsSet := map[string]bool{}
+	clusterKindsSet := map[string]bool{}
+	for _, manifest := range artifacts.Manifests {
+		if manifest.Inventory {
+			continue
+		}
+		if manifest.ClusterScoped {
+			clusterKindsSet[manifest.Kind] = true
+		} else {
+			namespacedKindsSet[manifest.Kind] = true
+		}
+	}
+
 	promptCtx := PromptContext{
-		TaskID:         task.TaskID,
-		Title:          templateTitle,
-		Description:    templateDesc,
-		TemplateYAML:   templateYAML,
-		ConstraintYAML: constraintYAML,
-		AlphaExamples:  alphaExamples,
-		BetaExamples:   betaExamples,
-		Namespace:      defaultNS,
+		TaskID:          task.TaskID,
+		Title:           templateTitle,
+		Description:     templateDesc,
+		TemplateYAML:    templateYAML,
+		ConstraintYAML:  constraintYAML,
+		AlphaExamples:   alphaExamples,
+		BetaExamples:    betaExamples,
+		Namespace:       defaultNS,
+		NamespacedKinds: sortedKeys(namespacedKindsSet),
+		ClusterKinds:    sortedKeys(clusterKindsSet),
 	}
 
 	return artifacts, promptCtx, nil
