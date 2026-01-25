@@ -1,0 +1,126 @@
+package main
+
+import (
+	"fmt"
+	"os"
+
+	"sigs.k8s.io/yaml"
+)
+
+// rewriteConstraint updates the constraint file to target the task namespace
+// when the constraint already specifies a match.namespaces list.
+func rewriteConstraint(src, dst, ns string) error {
+	doc, err := readConstraintYAML(src)
+	if err != nil {
+		return err
+	}
+
+	changed, msg := rewriteConstraintNamespaces(doc, ns)
+	if changed {
+		fmt.Printf("Rewriting constraint %s: %s\n", dst, msg)
+	} else if msg != "" {
+		fmt.Printf("Constraint %s %s\n", dst, msg)
+	}
+
+	return writeConstraintYAML(dst, doc)
+}
+
+// rewriteConstraintForPrompt returns a YAML string suitable for prompt context.
+// It mirrors the namespace rewrite applied to the on-disk constraint, but falls
+// back to the raw YAML if parsing or marshaling fails.
+func rewriteConstraintForPrompt(raw []byte, ns string) string {
+	doc, err := decodeConstraintYAML(raw)
+	if err != nil {
+		return string(raw)
+	}
+
+	changed, _ := rewriteConstraintNamespaces(doc, ns)
+	if !changed {
+		return string(raw)
+	}
+
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return string(raw)
+	}
+	return string(out)
+}
+
+func readConstraintYAML(path string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return decodeConstraintYAML(data)
+}
+
+func decodeConstraintYAML(data []byte) (map[string]interface{}, error) {
+	var doc map[string]interface{}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	if doc == nil {
+		doc = map[string]interface{}{}
+	}
+	return doc, nil
+}
+
+func writeConstraintYAML(path string, doc map[string]interface{}) error {
+	out, err := yaml.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0644)
+}
+
+// rewriteConstraintNamespaces applies the only manual transform we need:
+// if spec.match.namespaces is present and non-empty, replace it with the task
+// namespace to keep constraints scoped to the isolated test namespace.
+func rewriteConstraintNamespaces(doc map[string]interface{}, ns string) (bool, string) {
+	spec, ok := getMap(doc, "spec")
+	if !ok {
+		return false, "spec not found; leaving unchanged"
+	}
+	match, ok := getMap(spec, "match")
+	if !ok {
+		return false, "spec.match not found; leaving unchanged"
+	}
+	rawNamespaces, ok := match["namespaces"]
+	if !ok {
+		return false, "spec.match.namespaces not found; leaving unchanged"
+	}
+	namespaces, ok := toStringSlice(rawNamespaces)
+	if !ok {
+		return false, "spec.match.namespaces is not a string list; leaving unchanged"
+	}
+	if len(namespaces) == 0 {
+		return false, "spec.match.namespaces empty; leaving unchanged"
+	}
+
+	match["namespaces"] = []string{ns}
+	return true, fmt.Sprintf("spec.match.namespaces %v -> [%q]", namespaces, ns)
+}
+
+func getMap(doc map[string]interface{}, key string) (map[string]interface{}, bool) {
+	child, ok := doc[key].(map[string]interface{})
+	return child, ok
+}
+
+func toStringSlice(value interface{}) ([]string, bool) {
+	switch v := value.(type) {
+	case []string:
+		return v, true
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			s, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, s)
+		}
+		return out, true
+	default:
+		return nil, false
+	}
+}
