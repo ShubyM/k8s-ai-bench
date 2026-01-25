@@ -87,6 +87,7 @@ func run(cfg Config) error {
 	os.MkdirAll(cfg.OutputDir, 0755)
 
 	var generated, skipped int
+	var repairResults []RepairResult
 	for _, id := range sortedKeys(taskMap) {
 		task := taskMap[id]
 		if skip, reason := shouldSkip(cfg, task); skip {
@@ -94,17 +95,35 @@ func run(cfg Config) error {
 			skipped++
 			continue
 		}
-		if err := generateTask(cfg, task); err != nil {
+		repairResult, err := generateTask(cfg, task)
+		if err != nil {
 			fmt.Printf("Skipped %s: %v\n", id, err)
 			skipped++
+			// Still collect the repair result for the report even if it errored
+			if repairResult != nil {
+				repairResults = append(repairResults, *repairResult)
+			}
 		} else {
 			if cfg.Verbose {
 				fmt.Printf("Generated task %s\n", id)
 			}
 			generated++
+			if repairResult != nil {
+				repairResults = append(repairResults, *repairResult)
+			}
 		}
 	}
 	fmt.Printf("Generated tasks: %d (skipped %d)\n", generated, skipped)
+
+	// Write repair report if repairs were attempted
+	if cfg.Repair && len(repairResults) > 0 {
+		if err := writeRepairReport(cfg.OutputDir, repairResults); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to write repair report: %v\n", err)
+		} else {
+			fmt.Printf("Repair report written to %s/repair-report.md\n", cfg.OutputDir)
+		}
+	}
+
 	return nil
 }
 
@@ -128,13 +147,13 @@ func shouldSkip(cfg Config, task TaskMetadata) (bool, string) {
 	return false, ""
 }
 
-func generateTask(cfg Config, task TaskMetadata) error {
+func generateTask(cfg Config, task TaskMetadata) (*RepairResult, error) {
 	outDir := filepath.Join(cfg.OutputDir, task.TaskID)
 
 	// Generate manifests and collect prompt context
 	artifacts, promptCtx, err := GenerateManifests(task, outDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Generate prompt
@@ -165,12 +184,14 @@ timeout: 5m
 	writeScripts(outDir, task.TaskID, artifacts)
 
 	if cfg.Repair {
-		if err := repairTask(cfg, outDir, task.TaskID); err != nil {
-			return fmt.Errorf("repair %s: %w", task.TaskID, err)
+		result := repairTask(cfg, outDir, task.TaskID)
+		if result.Status == "error" {
+			return &result, fmt.Errorf("repair %s: %s", task.TaskID, result.Error)
 		}
+		return &result, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func rewriteConstraint(src, dst, ns string) error {

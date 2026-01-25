@@ -1,0 +1,12 @@
+script:
+- prompt: |
+    I need you to check the Horizontal Pod Autoscalers in the gk-horizontal-pod-autoscaler namespace. We want to ensure that all Horizontal Pod Autoscalers have their `.spec.minReplicas` and `.spec.maxReplicas` within the range of 3 to 6, and the difference between them is at least 1. Also, they must reference a valid `scaleTargetRef`. Can you identify any Horizontal Pod Autoscalers that violate these rules?
+    
+    For each violating resource, please print one line: VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

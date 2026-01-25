@@ -1,0 +1,23 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  labels:
+    k8s-ai-bench/expected: alpha
+    k8s-ai-bench/inventory: "false"
+    k8s-ai-bench/task: horizontal-pod-autoscaler
+  name: resource-alpha-01
+  namespace: gk-horizontal-pod-autoscaler
+spec:
+  maxReplicas: 6
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 900
+        type: Utilization
+    type: Resource
+  minReplicas: 3
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: resource-inventory-01

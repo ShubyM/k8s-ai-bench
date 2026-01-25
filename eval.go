@@ -544,6 +544,7 @@ func (x *TaskExecution) runSetup(ctx context.Context) error {
 func (x *TaskExecution) runCleanup(ctx context.Context) error {
 	var errs []error
 
+
 	// Run cleanup if specified
 	if x.task.Cleanup != "" {
 		cleanupPath := filepath.Join(x.taskDir, x.task.Cleanup)

@@ -1,0 +1,11 @@
+script:
+- prompt: |
+    I need you to check the Kubernetes cluster in the gk-block-loadbalancer-services namespace and identify any Services that are using type LoadBalancer. If you find any, please print their names.
+    Remember to check the Services in the gk-block-loadbalancer-services namespace. For each violating resource, print exactly one line in this format: VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

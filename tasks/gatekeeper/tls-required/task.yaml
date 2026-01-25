@@ -1,0 +1,15 @@
+script:
+- prompt: |
+    Hey, can you check the Ingress resources in the gk-tls-required namespace? We need to make sure all Ingress resources only allow HTTPS traffic. This means they must have the `kubernetes.io/ingress.allow-http` annotation set to `false`.
+    
+    List all the Ingress resources that violate this policy.
+    
+    For each violating resource, print exactly one line in this format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

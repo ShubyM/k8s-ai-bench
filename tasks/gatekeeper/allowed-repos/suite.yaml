@@ -1,0 +1,29 @@
+apiVersion: test.gatekeeper.sh/v1alpha1
+kind: Suite
+metadata:
+  name: allowed-repos
+tests:
+- cases:
+  - assertions:
+    - violations: "no"
+    inventory: null
+    name: example-allowed
+    object: artifacts/alpha-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: container-disallowed
+    object: artifacts/beta-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: initcontainer-disallowed
+    object: artifacts/beta-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: both-disallowed
+    object: artifacts/beta-01.yaml
+  constraint: constraint.yaml
+  name: allowed-repos
+  template: template.yaml

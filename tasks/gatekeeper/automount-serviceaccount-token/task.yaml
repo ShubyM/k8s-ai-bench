@@ -1,0 +1,13 @@
+script:
+- prompt: |
+    I need you to check all the Pods in the gk-automount-serviceaccount-token Namespace and tell me which ones allow containers to automatically mount service account tokens. List the names of any Pods that violate this policy.
+    
+    Report the name of each violating resource using this format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

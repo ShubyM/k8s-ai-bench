@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    k8s-ai-bench/expected: beta
+    k8s-ai-bench/inventory: "false"
+    k8s-ai-bench/task: allowed-repos
+  name: resource-beta-03
+  namespace: gk-allowed-repos
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi
+  initContainers:
+  - command:
+    - sh
+    - -c
+    - exit 0
+    image: nginx
+    name: nginxinit
+    resources:
+      limits:
+        cpu: 100m
+        memory: 30Mi

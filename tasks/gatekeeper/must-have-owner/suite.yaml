@@ -1,0 +1,24 @@
+apiVersion: test.gatekeeper.sh/v1alpha1
+kind: Suite
+metadata:
+  name: must-have-owner
+tests:
+- cases:
+  - assertions:
+    - violations: "no"
+    inventory: null
+    name: example-allowed
+    object: artifacts/alpha-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: example-disallowed
+    object: artifacts/beta-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: example-disallowed-label-value
+    object: artifacts/beta-01.yaml
+  constraint: constraint.yaml
+  name: must-have-owner
+  template: template.yaml

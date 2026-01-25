@@ -1,0 +1,13 @@
+script:
+- prompt: |
+    I need you to check the Ingress resources in the gk-unique-ingress-host Namespace. We want to ensure each Ingress has unique hostnames defined in its rules. If any Ingress resources share the same hostname, please identify them.
+    
+    Report each violating Ingress using this format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

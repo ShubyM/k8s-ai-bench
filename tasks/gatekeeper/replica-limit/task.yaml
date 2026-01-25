@@ -1,0 +1,13 @@
+script:
+- prompt: |
+    I need you to check a Kubernetes cluster for deployments that don't adhere to our replica policy. Specifically, all Deployments in the gk-replica-limit namespace must have a replica count between 3 and 50. Identify any Deployments in the gk-replica-limit namespace that violate this policy.
+    
+    Report each violation using the following format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

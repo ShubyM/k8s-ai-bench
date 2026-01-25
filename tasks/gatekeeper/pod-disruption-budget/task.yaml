@@ -1,0 +1,14 @@
+script:
+- prompt: |
+    I need you to check a few things in my Kubernetes cluster. I want to make sure that no one has deployed a PodDisruptionBudget that would block node draining. Specifically, I want to flag any PodDisruptionBudgets where `maxUnavailable` is set to 0. Additionally, I want to flag any PodDisruptionBudgets where `minAvailable` is equal to the number of replicas in the related Deployment, ReplicationController, ReplicaSet or StatefulSet.
+    
+    Please inspect all Deployments and PodDisruptionBudgets in the `gk-pod-disruption-budget` Namespace.
+    
+    Report any resources that violate this policy using the following format: VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

@@ -1,0 +1,11 @@
+script:
+- prompt: |
+    I need you to check the Services in the gk-unique-service-selector namespace and identify any that have non-unique selectors. Selectors are considered the same if they have identical keys and values. Report the names of only the violating Services, using the following format for each one:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

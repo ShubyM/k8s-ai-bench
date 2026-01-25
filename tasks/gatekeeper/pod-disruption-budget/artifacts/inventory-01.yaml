@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    k8s-ai-bench/expected: beta
+    k8s-ai-bench/inventory: "true"
+    k8s-ai-bench/task: pod-disruption-budget
+  name: resource-inventory-05
+  namespace: gk-pod-disruption-budget
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: nginx
+      example: disallowed-deployment

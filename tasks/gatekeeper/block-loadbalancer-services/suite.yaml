@@ -1,0 +1,19 @@
+apiVersion: test.gatekeeper.sh/v1alpha1
+kind: Suite
+metadata:
+  name: block-loadbalancer-services
+tests:
+- cases:
+  - assertions:
+    - violations: "no"
+    inventory: null
+    name: example-allowed
+    object: artifacts/alpha-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: example-disallowed
+    object: artifacts/beta-01.yaml
+  constraint: constraint.yaml
+  name: block-loadbalancer-services
+  template: template.yaml

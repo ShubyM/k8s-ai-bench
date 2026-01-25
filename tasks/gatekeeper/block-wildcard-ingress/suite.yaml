@@ -1,0 +1,29 @@
+apiVersion: test.gatekeeper.sh/v1alpha1
+kind: Suite
+metadata:
+  name: block-wildcard-ingress
+tests:
+- cases:
+  - assertions:
+    - violations: "no"
+    inventory: null
+    name: example-allowed
+    object: artifacts/alpha-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: blank-host
+    object: artifacts/beta-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: host-omitted
+    object: artifacts/beta-01.yaml
+  - assertions:
+    - violations: "yes"
+    inventory: null
+    name: wildcard-host
+    object: artifacts/beta-01.yaml
+  constraint: constraint.yaml
+  name: block-wildcard-ingress
+  template: template.yaml

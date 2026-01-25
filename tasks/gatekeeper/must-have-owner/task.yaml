@@ -1,0 +1,13 @@
+script:
+- prompt: |
+    I need your help auditing Kubernetes Namespaces in the cluster. I want to ensure all Namespaces have an `owner` label with a value that looks like a company username following the pattern `^[a-zA-Z]+.agilebank.demo$`. Find any Namespaces that are missing this label or have an invalid value for it.
+    
+    For each Namespace that violates this policy, please print the name of the Namespace in the format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

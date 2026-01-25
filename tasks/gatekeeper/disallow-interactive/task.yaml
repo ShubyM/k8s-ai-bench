@@ -1,0 +1,14 @@
+script:
+- prompt: |
+    I need you to check the Pods in the gk-disallow-interactive Namespace.
+    The policy we're enforcing disallows containers that have interactive TTY enabled.
+    Can you identify which Pods violate this policy?
+    Report the names of any violating resources, one per line, using this format:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

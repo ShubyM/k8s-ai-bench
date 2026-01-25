@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    k8s-ai-bench/expected: beta
+    k8s-ai-bench/inventory: "false"
+    k8s-ai-bench/task: block-loadbalancer-services
+  name: resource-beta-01
+  namespace: gk-block-loadbalancer-services
+spec:
+  ports:
+  - nodePort: 30007
+    port: 80
+    targetPort: 80
+  type: LoadBalancer

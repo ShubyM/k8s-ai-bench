@@ -1,0 +1,15 @@
+script:
+- prompt: |
+    I need you to check my Kubernetes cluster for any access control issues. Specifically, I want to make sure that no ClusterRoleBindings and RoleBindings are configured to allow the anonymous user or unauthenticated group access, except those using the "cluster-role-1" ClusterRole.
+    
+    Please inspect all ClusterRoleBindings cluster-wide, and RoleBindings in the gk-disallow-anonymous namespace. Identify any resources that violate this policy.
+    
+    For each violating resource, print exactly one line:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

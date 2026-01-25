@@ -1,0 +1,12 @@
+script:
+- prompt: |
+    Could you check the Services in the gk-allowed-ip Namespace? I need to find any Services that are using external IPs that aren't on the allowed list of 203.0.113.0.
+    
+    Report any violations you find using the format: VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m

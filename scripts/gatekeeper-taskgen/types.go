@@ -8,6 +8,7 @@ type Config struct {
 	OutputDir    string
 	SkipList     []string
 	Verbose      bool
+	Repair       bool
 	GeminiClient *genai.Client
 }
 
@@ -87,12 +88,23 @@ type TaskArtifacts struct {
 
 // PromptContext holds all context needed to generate a prompt
 type PromptContext struct {
-	TaskID         string
-	Title          string
-	Description    string
-	TemplateYAML   string
-	ConstraintYAML string
-	AlphaExamples  []string
-	BetaExamples   []string
-	Namespace      string
+	TaskID          string
+	Title           string
+	Description     string
+	TemplateYAML    string
+	ConstraintYAML  string
+	AlphaExamples   []string
+	BetaExamples    []string
+	Namespace       string
+	NamespacedKinds []string
+	ClusterKinds    []string
+}
+
+// RepairResult tracks what happened during a repair
+type RepairResult struct {
+	TaskID   string
+	Status   string // "repaired", "no_changes", "error"
+	FilePath string
+	Diff     string
+	Error    string
 }

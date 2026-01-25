@@ -1,0 +1,13 @@
+script:
+- prompt: |
+    I need your help auditing our Kubernetes cluster in the gk-must-have-key Namespace. We have a policy that requires all Pods to have a label with the key "pizza", regardless of the value. Can you please check all the Pods in the gk-must-have-key namespace and list the names of any pods that violate this policy?
+    
+    For each violating resource, please print exactly one line:
+    VIOLATING: <resource name>
+setup: setup.sh
+cleanup: cleanup.sh
+expect:
+- contains: "VIOLATING: resource-beta-\\d+"
+- notContains: "VIOLATING: resource-alpha-\\d+"
+isolation: cluster
+timeout: 5m
