@@ -65,7 +65,6 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 		for _, doc := range caseDocs[:1] {
 			kind := getStr(doc, "kind")
 			namespace := defaultNS
-			origName := getStr(doc, "metadata", "name")
 			var name string
 			if c.Expected == "alpha" {
 				name = fmt.Sprintf("resource-alpha-%02d", alphaIdx)
@@ -74,11 +73,7 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 				name = fmt.Sprintf("resource-beta-%02d", betaIdx)
 				betaIdx++
 			}
-			baseName := origName
-			if baseName == "" {
-				baseName = name
-			}
-			name, _ = nameRegistry.allocate(kind, namespace, baseName)
+			name, _ = nameRegistry.allocate(kind, namespace, "resource")
 			allDocs = append(allDocs, docInfo{doc, name})
 		}
 
