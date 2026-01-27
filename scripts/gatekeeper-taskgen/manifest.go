@@ -1,3 +1,17 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -55,7 +69,7 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 		if len(caseDocs) == 0 {
 			continue
 		}
-		
+
 		firstRes := NewResource(caseDocs[0])
 		if isAdmissionReview(firstRes) || !isDeployable(firstRes) {
 			continue
@@ -72,11 +86,11 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			res := NewResource(doc)
 			kind := res.Kind()
 			namespace := defaultNS
-			
-		  // obfuscate resources names to the model 
+
+			// obfuscate resources names to the model
 			baseName := fmt.Sprintf("resource-%03d", resourceIdx)
 			resourceIdx++
-			
+
 			name, _ := nameRegistry.allocate(kind, namespace, baseName)
 			allDocs = append(allDocs, docInfo{res, name})
 		}
@@ -196,4 +210,3 @@ func readYAMLDocs(path string) ([]map[string]interface{}, error) {
 	}
 	return results, nil
 }
-

@@ -1,6 +1,24 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
-import "strings"
+import (
+	"strings"
+
+	"sigs.k8s.io/yaml"
+)
 
 type manifestRewriteContext struct {
 	name     string
@@ -101,4 +119,70 @@ func podSpecForWorkload(res *Resource) map[string]any {
 		return nil
 	}
 	return res.Spec()
+}
+
+func shouldNormalizeResources(constraintYAML string) bool {
+	kind := constraintKind(constraintYAML)
+	switch kind {
+	case "K8sContainerLimits", "K8sContainerRequests", "K8sContainerRatios":
+		return false
+	default:
+		return true
+	}
+}
+
+func constraintKind(raw string) string {
+	var obj map[string]any
+	if err := yaml.Unmarshal([]byte(raw), &obj); err != nil {
+		return ""
+	}
+	if v, ok := obj["kind"].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func normalizeResourceValues(raw string) (string, error) {
+	var obj map[string]any
+	if err := yaml.Unmarshal([]byte(raw), &obj); err != nil {
+		return raw, err
+	}
+
+	spec, _ := obj["spec"].(map[string]any)
+	for _, field := range []string{"containers", "initContainers"} {
+		if list, ok := spec[field].([]any); ok {
+			for _, item := range list {
+				container, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				resources, _ := container["resources"].(map[string]any)
+				if len(resources) == 0 {
+					continue
+				}
+				if limits, ok := resources["limits"].(map[string]any); ok {
+					if _, ok := limits["cpu"]; ok {
+						limits["cpu"] = "1m"
+					}
+					if _, ok := limits["memory"]; ok {
+						limits["memory"] = "1Mi"
+					}
+				}
+				if requests, ok := resources["requests"].(map[string]any); ok {
+					if _, ok := requests["cpu"]; ok {
+						requests["cpu"] = "1m"
+					}
+					if _, ok := requests["memory"]; ok {
+						requests["memory"] = "1Mi"
+					}
+				}
+			}
+		}
+	}
+
+	out, err := yaml.Marshal(obj)
+	if err != nil {
+		return raw, err
+	}
+	return strings.TrimSpace(string(out)), nil
 }

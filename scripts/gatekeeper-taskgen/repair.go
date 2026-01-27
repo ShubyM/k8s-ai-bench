@@ -1,16 +1,30 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"google.golang.org/genai"
-	"sigs.k8s.io/yaml"
 )
 
 const repairModel = "gemini-2.5-flash"
@@ -44,14 +58,14 @@ func repairTask(cfg Config, outDir, taskID string) ([]RepairResult, error) {
 		r := repairManifest(cfg, taskID, alphaPath, "alpha (must be compliant)", string(constraintYAML), string(templateYAML))
 		results = append(results, r)
 		if r.Status == "error" && firstErr == nil {
-			firstErr = fmt.Errorf(r.Error)
+			firstErr = fmt.Errorf("%s", r.Error)
 		}
 	}
 	for _, betaPath := range betaPaths {
 		r := repairManifest(cfg, taskID, betaPath, "beta (must violate)", string(constraintYAML), string(templateYAML))
 		results = append(results, r)
 		if r.Status == "error" && firstErr == nil {
-			firstErr = fmt.Errorf(r.Error)
+			firstErr = fmt.Errorf("%s", r.Error)
 		}
 	}
 
@@ -112,19 +126,22 @@ func repairManifest(cfg Config, taskID, targetPath, targetRole, constraintYAML, 
 		return RepairResult{TaskID: taskID, Status: "error", Error: err.Error()}
 	}
 
+	normalizedOriginal := strings.TrimSpace(string(targetYAML))
+	if shouldNormalizeResources(constraintYAML) {
+		if out, err := normalizeResourceValues(normalizedOriginal); err == nil {
+			normalizedOriginal = out
+		}
+	}
+
 	cleaned := stripCodeFences(text)
 	if strings.Contains(strings.ToUpper(cleaned), "NO_CHANGES") {
-		normalized := strings.TrimSpace(string(targetYAML))
-		if shouldNormalizeResources(constraintYAML) {
-			if out, err := normalizeResourceValues(normalized); err == nil {
-				normalized = out
-			}
-		}
-		if normalized != strings.TrimSpace(string(targetYAML)) {
-			if err := os.WriteFile(targetPath, []byte(normalized+"\n"), 0644); err != nil {
+		if normalizedOriginal != strings.TrimSpace(string(targetYAML)) {
+			// Normalization changed the file even if LLM said NO_CHANGES
+			diff := computeDiff(string(targetYAML), normalizedOriginal)
+			if err := os.WriteFile(targetPath, []byte(normalizedOriginal+"\n"), 0644); err != nil {
 				return RepairResult{TaskID: taskID, Status: "error", FilePath: targetPath, Error: err.Error()}
 			}
-			return RepairResult{TaskID: taskID, Status: "repaired", FilePath: targetPath}
+			return RepairResult{TaskID: taskID, Status: "repaired", FilePath: targetPath, Diff: diff}
 		}
 		if cfg.Verbose {
 			fmt.Printf("Repair %s: NO_CHANGES (%s)\n", taskID, targetPath)
@@ -136,81 +153,40 @@ func repairManifest(cfg Config, taskID, targetPath, targetRole, constraintYAML, 
 	if !strings.Contains(trimmed, "apiVersion:") && !strings.Contains(trimmed, "kind:") {
 		return RepairResult{TaskID: taskID, Status: "error", FilePath: targetPath, Error: "repair output missing manifest YAML"}
 	}
+
+	finalContent := trimmed
 	if shouldNormalizeResources(constraintYAML) {
 		if normalized, err := normalizeResourceValues(trimmed); err == nil {
-			trimmed = normalized
+			finalContent = normalized
 		}
 	}
-	if err := os.WriteFile(targetPath, []byte(trimmed+"\n"), 0644); err != nil {
+
+	if finalContent == strings.TrimSpace(string(targetYAML)) {
+		return RepairResult{TaskID: taskID, Status: "no_changes", FilePath: targetPath}
+	}
+
+	diff := computeDiff(string(targetYAML), finalContent)
+	if err := os.WriteFile(targetPath, []byte(finalContent+"\n"), 0644); err != nil {
 		return RepairResult{TaskID: taskID, Status: "error", FilePath: targetPath, Error: err.Error()}
 	}
-	return RepairResult{TaskID: taskID, Status: "repaired", FilePath: targetPath}
+	return RepairResult{TaskID: taskID, Status: "repaired", FilePath: targetPath, Diff: diff}
 }
 
-func shouldNormalizeResources(constraintYAML string) bool {
-	kind := constraintKind(constraintYAML)
-	switch kind {
-	case "K8sContainerLimits", "K8sContainerRequests", "K8sContainerRatios":
-		return false
-	default:
-		return true
-	}
-}
+func computeDiff(a, b string) string {
+	f1, _ := os.CreateTemp("", "diff-a-")
+	f2, _ := os.CreateTemp("", "diff-b-")
+	defer os.Remove(f1.Name())
+	defer os.Remove(f2.Name())
 
-func constraintKind(raw string) string {
-	var obj map[string]interface{}
-	if err := yaml.Unmarshal([]byte(raw), &obj); err != nil {
-		return ""
-	}
-	if v, ok := obj["kind"].(string); ok {
-		return v
-	}
-	return ""
-}
+	f1.WriteString(a)
+	f1.Close()
+	f2.WriteString(b)
+	f2.Close()
 
-func normalizeResourceValues(raw string) (string, error) {
-	var obj map[string]interface{}
-	if err := yaml.Unmarshal([]byte(raw), &obj); err != nil {
-		return raw, err
-	}
+	cmd := exec.Command("diff", "-u", f1.Name(), f2.Name())
+	out, _ := cmd.CombinedOutput()
 
-	spec, _ := obj["spec"].(map[string]interface{})
-	for _, field := range []string{"containers", "initContainers"} {
-		if list, ok := spec[field].([]interface{}); ok {
-			for _, item := range list {
-				container, ok := item.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				resources, _ := container["resources"].(map[string]interface{})
-				if len(resources) == 0 {
-					continue
-				}
-				if limits, ok := resources["limits"].(map[string]interface{}); ok {
-					if _, ok := limits["cpu"]; ok {
-						limits["cpu"] = "1m"
-					}
-					if _, ok := limits["memory"]; ok {
-						limits["memory"] = "1Mi"
-					}
-				}
-				if requests, ok := resources["requests"].(map[string]interface{}); ok {
-					if _, ok := requests["cpu"]; ok {
-						requests["cpu"] = "1m"
-					}
-					if _, ok := requests["memory"]; ok {
-						requests["memory"] = "1Mi"
-					}
-				}
-			}
-		}
-	}
-
-	out, err := yaml.Marshal(obj)
-	if err != nil {
-		return raw, err
-	}
-	return strings.TrimSpace(string(out)), nil
+	return string(out)
 }
 
 func appendYAMLSection(b *strings.Builder, title, raw string, limit int) {
