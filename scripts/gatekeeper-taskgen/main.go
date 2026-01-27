@@ -311,6 +311,10 @@ for file in "$ARTIFACTS_DIR"/inventory-*.yaml "$ARTIFACTS_DIR"/alpha-*.yaml "$AR
     Job)
       kubectl wait --for=condition=Complete --timeout=120s -f "$file"
       ;;
+    CronJob)
+      # CronJobs are schedule-based; just verify the resource exists
+      kubectl get -f "$file" >/dev/null
+      ;;
   esac
 done
 # Show deployed resources for debugging
@@ -318,6 +322,8 @@ kubectl get all -n "$TASK_NAMESPACE" 2>/dev/null || true
 kubectl get ingress -n "$TASK_NAMESPACE" 2>/dev/null || true
 kubectl get hpa -n "$TASK_NAMESPACE" 2>/dev/null || true
 kubectl get pdb -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get cronjob -n "$TASK_NAMESPACE" 2>/dev/null || true
+kubectl get job -n "$TASK_NAMESPACE" 2>/dev/null || true
 kubectl get clusterrolebinding 2>/dev/null | head -n 20 || true
 `, ns, strings.TrimSpace(nsSetup.String()))
 

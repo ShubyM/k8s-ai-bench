@@ -215,6 +215,10 @@ func rewriteManifest(doc map[string]interface{}, name, ns string, nameMap map[st
 	case "Deployment", "ReplicaSet", "DaemonSet":
 		updatePodTemplate(spec, nameMap)
 		fixReplicaCount(spec, expected)
+	case "Job":
+		updatePodTemplate(spec, nameMap)
+	case "CronJob":
+		updateCronJobTemplate(spec, nameMap)
 	case "Pod":
 		updatePodSpec(spec, nameMap)
 	case "RoleBinding", "ClusterRoleBinding":
@@ -243,6 +247,14 @@ func updatePodTemplate(spec map[string]interface{}, nameMap map[string]string) {
 	if t, ok := spec["template"].(map[string]interface{}); ok {
 		if ps, ok := t["spec"].(map[string]interface{}); ok {
 			updatePodSpec(ps, nameMap)
+		}
+	}
+}
+
+func updateCronJobTemplate(spec map[string]interface{}, nameMap map[string]string) {
+	if jt, ok := spec["jobTemplate"].(map[string]interface{}); ok {
+		if jtSpec, ok := jt["spec"].(map[string]interface{}); ok {
+			updatePodTemplate(jtSpec, nameMap)
 		}
 	}
 }
@@ -305,20 +317,7 @@ func fixReplicaCount(spec map[string]interface{}, expected string) {
 
 // fixInitContainers adds exit command to init containers that would run forever
 func fixInitContainers(doc map[string]interface{}) {
-	kind := getStr(doc, "kind")
-	var podSpec map[string]interface{}
-
-	switch kind {
-	case "Pod":
-		podSpec, _ = doc["spec"].(map[string]interface{})
-	case "Deployment", "ReplicaSet", "DaemonSet", "StatefulSet":
-		if spec, ok := doc["spec"].(map[string]interface{}); ok {
-			if template, ok := spec["template"].(map[string]interface{}); ok {
-				podSpec, _ = template["spec"].(map[string]interface{})
-			}
-		}
-	}
-
+	podSpec := getPodSpec(doc)
 	if podSpec == nil {
 		return
 	}
@@ -350,20 +349,7 @@ func fixInitContainers(doc map[string]interface{}) {
 // fixBadImages replaces images that fail to pull with working alternatives
 // Only for images where the replacement doesn't affect the policy test
 func fixBadImages(doc map[string]interface{}) {
-	kind := getStr(doc, "kind")
-	var podSpec map[string]interface{}
-
-	switch kind {
-	case "Pod":
-		podSpec, _ = doc["spec"].(map[string]interface{})
-	case "Deployment", "ReplicaSet", "DaemonSet", "StatefulSet":
-		if spec, ok := doc["spec"].(map[string]interface{}); ok {
-			if template, ok := spec["template"].(map[string]interface{}); ok {
-				podSpec, _ = template["spec"].(map[string]interface{})
-			}
-		}
-	}
-
+	podSpec := getPodSpec(doc)
 	if podSpec == nil {
 		return
 	}
@@ -403,20 +389,50 @@ func isAdmissionReview(doc map[string]interface{}) bool {
 	return getStr(doc, "kind") == "AdmissionReview"
 }
 
+// getPodSpec extracts the pod spec from any workload resource.
+// For Pod it returns doc["spec"], for Deployment/StatefulSet/DaemonSet/ReplicaSet/Job
+// it returns spec.template.spec, and for CronJob it returns
+// spec.jobTemplate.spec.template.spec.
+func getPodSpec(doc map[string]interface{}) map[string]interface{} {
+	kind := getStr(doc, "kind")
+	spec, _ := doc["spec"].(map[string]interface{})
+	if spec == nil {
+		return nil
+	}
+
+	switch kind {
+	case "Pod":
+		return spec
+	case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job":
+		if t, ok := spec["template"].(map[string]interface{}); ok {
+			ps, _ := t["spec"].(map[string]interface{})
+			return ps
+		}
+	case "CronJob":
+		if jt, ok := spec["jobTemplate"].(map[string]interface{}); ok {
+			if jtSpec, ok := jt["spec"].(map[string]interface{}); ok {
+				if t, ok := jtSpec["template"].(map[string]interface{}); ok {
+					ps, _ := t["spec"].(map[string]interface{})
+					return ps
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func isDeployable(doc map[string]interface{}) bool {
-	if getStr(doc, "kind") != "Pod" {
+	podSpec := getPodSpec(doc)
+	if podSpec == nil {
+		// Not a workload resource or missing spec — allow through
 		return true
 	}
-	spec, ok := doc["spec"].(map[string]interface{})
-	if !ok {
-		return true
-	}
-	if _, hasEphemeral := spec["ephemeralContainers"]; hasEphemeral {
+	if _, hasEphemeral := podSpec["ephemeralContainers"]; hasEphemeral {
 		return false
 	}
 	names := map[string]bool{}
 	for _, key := range []string{"containers", "initContainers"} {
-		if containers, ok := spec[key].([]interface{}); ok {
+		if containers, ok := podSpec[key].([]interface{}); ok {
 			for _, c := range containers {
 				if cm, ok := c.(map[string]interface{}); ok {
 					if name, ok := cm["name"].(string); ok {
