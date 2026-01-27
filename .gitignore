@@ -1,6 +1,7 @@
 # Binary
 k8s-ai-bench
 kubectl-ai
+scripts/gatekeeper-taskgen/gatekeeper-taskgen
 
 # Log files
 *.log
