@@ -87,9 +87,10 @@ type TaskManifest struct {
 
 // TaskArtifacts holds all generated artifacts for a task
 type TaskArtifacts struct {
-	Manifests  []TaskManifest
-	CaseFiles  map[string][]string
-	Namespaces []string
+	Manifests      []TaskManifest
+	CaseFiles      map[string][]string
+	InventoryFiles map[string][]string
+	Namespaces     []string
 }
 
 // PromptContext holds all context needed to generate a prompt
@@ -158,6 +159,10 @@ func (r *Resource) Labels() map[string]any {
 
 func (r *Resource) SetLabel(key, value string) {
 	r.Labels()[key] = value
+}
+
+func (r *Resource) IsClusterScoped() bool {
+	return isClusterScopedKind(r.Kind())
 }
 
 // Spec returns the spec map, creating it if it doesn't exist

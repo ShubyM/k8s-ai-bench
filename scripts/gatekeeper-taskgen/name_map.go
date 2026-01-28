@@ -23,11 +23,11 @@ type nameKey struct {
 }
 
 type nameRegistry struct {
-	used map[nameKey]bool
+	used map[nameKey]struct{}
 }
 
 func newNameRegistry() *nameRegistry {
-	return &nameRegistry{used: map[nameKey]bool{}}
+	return &nameRegistry{used: map[nameKey]struct{}{}}
 }
 
 func (nr *nameRegistry) allocate(kind, namespace, base string) (string, bool) {
@@ -36,8 +36,8 @@ func (nr *nameRegistry) allocate(kind, namespace, base string) (string, bool) {
 	}
 
 	key := nameKey{kind: kind, namespace: namespace, name: base}
-	if !nr.used[key] {
-		nr.used[key] = true
+	if _, ok := nr.used[key]; !ok {
+		nr.used[key] = struct{}{}
 		return base, false
 	}
 
@@ -45,8 +45,8 @@ func (nr *nameRegistry) allocate(kind, namespace, base string) (string, bool) {
 	for i := 2; ; i++ {
 		candidate := fmt.Sprintf("%s-%d", base, i)
 		key = nameKey{kind: kind, namespace: namespace, name: candidate}
-		if !nr.used[key] {
-			nr.used[key] = true
+		if _, ok := nr.used[key]; !ok {
+			nr.used[key] = struct{}{}
 			return candidate, true
 		}
 	}

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"slices"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -46,7 +47,12 @@ func rewriteManifest(doc map[string]any, name, ns, taskID, expected, constraintY
 
 func applyIdentity(res *Resource, ctx manifestRewriteContext) {
 	res.SetName(ctx.name)
-	res.SetNamespace(ctx.ns)
+	if res.IsClusterScoped() {
+		meta := res.NestedMap("metadata")
+		delete(meta, "namespace")
+	} else {
+		res.SetNamespace(ctx.ns)
+	}
 	res.SetLabel("k8s-ai-bench/task", ctx.taskID)
 }
 
@@ -127,12 +133,15 @@ func podSpecForWorkload(res *Resource) map[string]any {
 
 func shouldNormalizeResources(constraintYAML string) bool {
 	kind := constraintKind(constraintYAML)
-	switch kind {
-	case "K8sContainerLimits", "K8sContainerRequests", "K8sContainerRatios", "K8sRequiredResources", "K8sContainerEphemeralStorageLimit":
-		return false
-	default:
-		return true
-	}
+	return !slices.Contains(normalizationSkipKinds, kind)
+}
+
+var normalizationSkipKinds = []string{
+	"K8sContainerLimits",
+	"K8sContainerRequests",
+	"K8sContainerRatios",
+	"K8sRequiredResources",
+	"K8sContainerEphemeralStorageLimit",
 }
 
 func constraintKind(raw string) string {

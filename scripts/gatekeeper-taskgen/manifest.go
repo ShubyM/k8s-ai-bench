@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -30,20 +31,23 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 
 	defaultNS := "gk-" + task.TaskID
 	artifacts := TaskArtifacts{
-		CaseFiles: map[string][]string{},
+		CaseFiles:      map[string][]string{},
+		InventoryFiles: map[string][]string{},
 	}
 	resourceIdx := 1
 	alphaFileIdx, betaFileIdx := 1, 1
-	nsSet := map[string]bool{defaultNS: true}
+	nsSet := map[string]bool{}
 	nameRegistry := newNameRegistry()
 
 	var templateTitle, templateDesc, templateYAML, constraintYAML string
 	var alphaExamples, betaExamples []string
+	nameSensitive := false
 
 	// Read template metadata
 	if docs, _ := readYAMLDocs(task.TemplatePath); len(docs) > 0 {
 		if data, err := os.ReadFile(task.TemplatePath); err == nil {
 			templateYAML = string(data)
+			nameSensitive = templateRequiresLiteralName(templateYAML)
 		}
 		res := NewResource(docs[0])
 		if meta := res.NestedMap("metadata"); meta != nil {
@@ -86,9 +90,17 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			res := NewResource(doc)
 			kind := res.Kind()
 			namespace := defaultNS
+			if res.IsClusterScoped() {
+				namespace = ""
+			}
 
 			// obfuscate resources names to the model
 			baseName := fmt.Sprintf("resource-%03d", resourceIdx)
+			if nameSensitive && c.Expected == "beta" {
+				if orig := res.Name(); orig != "" {
+					baseName = orig
+				}
+			}
 			resourceIdx++
 
 			name, _ := nameRegistry.allocate(kind, namespace, baseName)
@@ -150,6 +162,10 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 
 				// Rewrite with original name
 				rewriteManifest(doc, name, defaultNS, task.TaskID, "inventory", constraintYAML)
+				ns := res.Namespace()
+				if ns != "" {
+					nsSet[ns] = true
+				}
 
 				// Save
 				fileName := fmt.Sprintf("inventory-%s-%d-%d.yaml", c.Name, i, j)
@@ -165,9 +181,9 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 					Expected:  "inventory",
 					Kind:      res.Kind(),
 					Name:      name,
-					Namespace: defaultNS,
+					Namespace: res.Namespace(),
 				})
-				artifacts.CaseFiles[c.Name] = append(artifacts.CaseFiles[c.Name], relPath)
+				artifacts.InventoryFiles[c.Name] = append(artifacts.InventoryFiles[c.Name], relPath)
 			}
 		}
 	}
@@ -175,10 +191,19 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 	artifacts.Namespaces = sortedKeys(nsSet)
 
 	namespacedKindsSet := map[string]bool{}
+	clusterKindsSet := map[string]bool{}
 	for _, manifest := range artifacts.Manifests {
-		namespacedKindsSet[manifest.Kind] = true
+		if isClusterScopedKind(manifest.Kind) {
+			clusterKindsSet[manifest.Kind] = true
+		} else {
+			namespacedKindsSet[manifest.Kind] = true
+		}
 	}
 
+	namespaceForPrompt := defaultNS
+	if len(namespacedKindsSet) == 0 {
+		namespaceForPrompt = ""
+	}
 	promptCtx := PromptContext{
 		TaskID:          task.TaskID,
 		Title:           templateTitle,
@@ -187,9 +212,9 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 		ConstraintYAML:  constraintYAML,
 		AlphaExamples:   alphaExamples,
 		BetaExamples:    betaExamples,
-		Namespace:       defaultNS,
+		Namespace:       namespaceForPrompt,
 		NamespacedKinds: sortedKeys(namespacedKindsSet),
-		ClusterKinds:    []string{},
+		ClusterKinds:    sortedKeys(clusterKindsSet),
 	}
 
 	return artifacts, promptCtx, nil
@@ -209,9 +234,9 @@ func isDeployable(res *Resource) bool {
 	}
 	names := map[string]bool{}
 	for _, key := range []string{"containers", "initContainers"} {
-		if containers, ok := spec[key].([]interface{}); ok {
+		if containers, ok := spec[key].([]any); ok {
 			for _, c := range containers {
-				if cm, ok := c.(map[string]interface{}); ok {
+				if cm, ok := c.(map[string]any); ok {
 					if name, ok := cm["name"].(string); ok {
 						if names[name] {
 							return false
@@ -243,4 +268,10 @@ func readYAMLDocs(path string) ([]map[string]any, error) {
 		}
 	}
 	return results, nil
+}
+
+var nameLiteralPattern = regexp.MustCompile(`metadata\.name\s*[=!]=\s*"`)
+
+func templateRequiresLiteralName(templateYAML string) bool {
+	return nameLiteralPattern.MatchString(templateYAML)
 }

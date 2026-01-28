@@ -21,6 +21,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"google.golang.org/genai"
@@ -28,22 +29,10 @@ import (
 )
 
 var defaultSkipList = []string{
-	"allowed-ip",
-	"block-endpoint-default-role",
-	"block-endpoint-default-role",
-	"block-wildcard-ingress",
-	"disallow-anonymous",
-	"disallow-anonymous",
-	"must-have-owner",
-	"must-have-set-of-annotations",
-	"pod-disruption-budget",
-	"pod-disruption-budget",
+	"horizontal-pod-autoscaler",
+	"replica-limit",
 	"storageclass",
 	"storageclass-allowlist",
-	"tls-optional",
-	"tls-required",
-	"unique-ingress-host",
-	"unique-service-selector",
 	"verifydeprecatedapi-1.16",
 	"verifydeprecatedapi-1.22",
 	"verifydeprecatedapi-1.25",
@@ -177,10 +166,10 @@ func runRepair(cfg Config) error {
 }
 
 func shouldSkip(cfg Config, task TaskMetadata) (bool, string) {
-	for _, skip := range cfg.SkipList {
-		if skip == task.TestName || skip == task.SuiteName || strings.Contains(task.TestName, skip) {
-			return true, "skip list"
-		}
+	if slices.ContainsFunc(cfg.SkipList, func(skip string) bool {
+		return skip == task.TestName || skip == task.SuiteName || strings.Contains(task.TestName, skip)
+	}) {
+		return true, "skip list"
 	}
 	alpha, beta := 0, 0
 	for _, c := range task.Cases {
@@ -289,11 +278,15 @@ func writeSuite(outDir string, task TaskMetadata, artifacts TaskArtifacts) {
 			if c.Expected == "beta" {
 				violations = "yes"
 			}
-			cases = append(cases, map[string]interface{}{
+			entry := map[string]interface{}{
 				"name":       c.Name,
 				"object":     cf,
 				"assertions": []map[string]interface{}{{"violations": violations}},
-			})
+			}
+			if inv := artifacts.InventoryFiles[c.Name]; len(inv) > 0 {
+				entry["inventory"] = inv
+			}
+			cases = append(cases, entry)
 		}
 	}
 	suite := map[string]interface{}{
@@ -324,6 +317,18 @@ func writeScripts(outDir, taskID string, artifacts TaskArtifacts) {
 		fmt.Fprintf(&nsCleanup, "kubectl delete namespace %q --ignore-not-found\n", n)
 	}
 
+	hasPods := false
+	for _, manifest := range artifacts.Manifests {
+		if manifest.Kind == "Pod" {
+			hasPods = true
+			break
+		}
+	}
+	podSummary := ""
+	if hasPods {
+		podSummary = "kubectl get pods -n \"$TASK_NAMESPACE\" 2>/dev/null || true"
+	}
+
 	setup := fmt.Sprintf(`#!/usr/bin/env bash
 set -euo pipefail
 shopt -s nullglob
@@ -334,15 +339,15 @@ ARTIFACTS_DIR="$(dirname "$0")/artifacts"
 for file in "$ARTIFACTS_DIR"/inventory-*.yaml; do
   kubectl apply -f "$file"
 done
-# Apply alpha/beta pod resources
+# Apply alpha/beta resources
 for file in "$ARTIFACTS_DIR"/alpha-*.yaml; do
   kubectl apply -f "$file"
 done
 for file in "$ARTIFACTS_DIR"/beta-*.yaml; do
   kubectl apply -f "$file"
 done
-kubectl get pods -n "$TASK_NAMESPACE" 2>/dev/null || true
-`, ns, strings.TrimSpace(nsSetup.String()))
+%s
+`, ns, strings.TrimSpace(nsSetup.String()), podSummary)
 	os.WriteFile(filepath.Join(outDir, "setup.sh"), []byte(setup), 0755)
 
 	cleanup := fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s", nsCleanup.String())

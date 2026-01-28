@@ -15,7 +15,8 @@
 package main
 
 import (
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 )
 
@@ -28,11 +29,8 @@ func indent(text, prefix string) string {
 }
 
 func sortedKeys[T any](m map[string]T) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Collect(maps.Keys(m))
+	slices.Sort(keys)
 	return keys
 }
 
@@ -60,4 +58,28 @@ func ensureMap(parent map[string]any, key string) map[string]any {
 	m := map[string]any{}
 	parent[key] = m
 	return m
+}
+
+var clusterScopedKinds = []string{
+	"APIService",
+	"ClusterRole",
+	"ClusterRoleBinding",
+	"CustomResourceDefinition",
+	"CSIDriver",
+	"CSINode",
+	"FlowSchema",
+	"MutatingWebhookConfiguration",
+	"Namespace",
+	"Node",
+	"PersistentVolume",
+	"PodSecurityPolicy",
+	"PriorityClass",
+	"RuntimeClass",
+	"StorageClass",
+	"ValidatingWebhookConfiguration",
+	"VolumeAttachment",
+}
+
+func isClusterScopedKind(kind string) bool {
+	return slices.Contains(clusterScopedKinds, kind)
 }
