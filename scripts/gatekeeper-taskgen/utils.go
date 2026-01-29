@@ -15,9 +15,13 @@
 package main
 
 import (
+	"bytes"
 	"maps"
+	"os"
 	"slices"
 	"strings"
+
+	"sigs.k8s.io/yaml"
 )
 
 func indent(text, prefix string) string {
@@ -82,4 +86,22 @@ var clusterScopedKinds = []string{
 
 func isClusterScopedKind(kind string) bool {
 	return slices.Contains(clusterScopedKinds, kind)
+}
+
+func readYAMLDocs(path string) ([]map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var results []map[string]any
+	for doc := range bytes.SplitSeq(data, []byte("---")) {
+		if len(bytes.TrimSpace(doc)) == 0 {
+			continue
+		}
+		var obj map[string]any
+		if yaml.Unmarshal(doc, &obj) == nil {
+			results = append(results, obj)
+		}
+	}
+	return results, nil
 }
