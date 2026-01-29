@@ -132,16 +132,16 @@ func podSpecForWorkload(res *Resource) map[string]any {
 }
 
 func shouldNormalizeResources(constraintYAML string) bool {
+	var normalizationSkipKinds = []string{
+		"K8sContainerLimits",
+		"K8sContainerRequests",
+		"K8sContainerRatios",
+		"K8sRequiredResources",
+		"K8sContainerEphemeralStorageLimit",
+	}
+
 	kind := constraintKind(constraintYAML)
 	return !slices.Contains(normalizationSkipKinds, kind)
-}
-
-var normalizationSkipKinds = []string{
-	"K8sContainerLimits",
-	"K8sContainerRequests",
-	"K8sContainerRatios",
-	"K8sRequiredResources",
-	"K8sContainerEphemeralStorageLimit",
 }
 
 func constraintKind(raw string) string {
@@ -161,7 +161,7 @@ func normalizeYAML(raw, constraintYAML string) (string, error) {
 		return raw, err
 	}
 	res := NewResource(obj)
-	
+
 	if shouldNormalizeResources(constraintYAML) {
 		enforceMinimalResources(res)
 	}
@@ -208,22 +208,21 @@ func enforceMinimalResources(res *Resource) {
 						}
 					}
 				}
-				
-				// Update list item
+
 				list[i] = container
 			}
 		}
 	}
 }
 
-var replicaWorkloads = []string{
-	"Deployment",
-	"StatefulSet",
-	"ReplicaSet",
-	"ReplicationController",
-}
-
 func enforceMinimalReplicas(res *Resource) {
+	var replicaWorkloads = []string{
+		"Deployment",
+		"StatefulSet",
+		"ReplicaSet",
+		"ReplicationController",
+	}
+
 	if slices.Contains(replicaWorkloads, res.Kind()) {
 		spec := res.Spec()
 		if spec == nil {
@@ -242,4 +241,3 @@ func shouldNormalizeReplicas(constraintYAML string) bool {
 	kind := constraintKind(constraintYAML)
 	return !strings.Contains(strings.ToLower(kind), "replica")
 }
-

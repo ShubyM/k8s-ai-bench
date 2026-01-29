@@ -154,7 +154,6 @@ func GenerateManifests(task TaskMetadata, outDir string) (TaskArtifacts, PromptC
 			invDocs, _ := readYAMLDocs(invPath)
 			for j, doc := range invDocs {
 				res := NewResource(doc)
-				// KEEP ORIGINAL NAME for inventory to support references
 				name := res.Name()
 				if name == "" {
 					name = fmt.Sprintf("inventory-%s-%d-%d", c.Name, i, j)
@@ -249,8 +248,6 @@ func isDeployable(res *Resource) bool {
 	}
 	return true
 }
-
-// YAML helpers
 
 func readYAMLDocs(path string) ([]map[string]any, error) {
 	data, err := os.ReadFile(path)

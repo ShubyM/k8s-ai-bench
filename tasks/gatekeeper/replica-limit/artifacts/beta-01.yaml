@@ -6,7 +6,7 @@ metadata:
   name: resource-002
   namespace: gk-replica-limit
 spec:
-  replicas: 100
+  replicas: 4
   selector:
     matchLabels:
       app: nginx
